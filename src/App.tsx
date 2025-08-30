@@ -1,25 +1,31 @@
+import { RouterProvider } from "react-router";
+import router from "./router";
+import useUserStore from "./store/user";
+import ghostDriveApi from "./apis/ghost-drive-api";
 import { useEffect } from "react";
-import cryptoUtils from "./utils/crypto";
+import { ACCESS_TOKEN_KEY } from "./constants";
 
 function App() {
-  const main = async () => {
-    const pin = "123456";
-    const aesKey = await cryptoUtils.generateFileEncryptionKey();
-    console.log("aesKey", aesKey);
-    const encryptedKey = await cryptoUtils.encryptFileEncryptionKey(aesKey, pin);
-    console.log("encryptedKey", encryptedKey);
-    const decryptedKey = await cryptoUtils.decryptFileEncryptionKey(encryptedKey, pin);
-    console.log("decryptedKey", decryptedKey);
-    const isPinValid = await cryptoUtils.isPinValid(pin, encryptedKey);
-    console.log("isPinValid", isPinValid);
+  const { setUser } = useUserStore();
+  const fetchUserInfo = async () => {
+    try {
+      const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+      if (!accessToken) {
+        return;
+      }
+      const user = await ghostDriveApi.user.getUserInfo();
+      setUser(user);
+    } catch (error) {
+      console.error(error);
+    }
   };
   useEffect(() => {
-    main();
+    fetchUserInfo();
   }, []);
   return (
-    <main>
-      <h1 className="text-3xl font-bold underline">Hello World</h1>
-    </main>
+    <>
+      <RouterProvider router={router} />
+    </>
   );
 }
 
