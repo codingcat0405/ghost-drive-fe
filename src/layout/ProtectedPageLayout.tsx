@@ -1,31 +1,23 @@
-import { Link, Outlet, useNavigate } from "react-router";
-import { useEffect } from "react";
-import { ACCESS_TOKEN_KEY } from "../constants";
-import {
-  AppShell,
-  Avatar,
-  Burger,
-  Button,
-  Flex,
-  Input,
-  Switch,
-} from "@mantine/core";
-import { useDisclosure } from "@mantine/hooks";
-import { IoSettingsOutline, IoSunnyOutline } from "react-icons/io5";
-import { TbMoonStars } from "react-icons/tb";
-import { CiSettings } from "react-icons/ci";
-import { FaRegQuestionCircle } from "react-icons/fa";
+import { Outlet, useNavigate } from "react-router";
+import Sidebar from "../components/Sidebar";
+import Header from "../components/Header";
+import Footer from "../components/Footer";
 
 const ProtectedPageLayout = () => {
-  const navigate = useNavigate();
-  // useEffect(() => {
-  //   if (!localStorage.getItem(ACCESS_TOKEN_KEY)) {
-  //     navigate("/login");
-  //   }
-  // }, []);
-  const [opened, { toggle }] = useDisclosure(true);
   return (
-   <Outlet />
+    <div className="flex h-screen bg-slate-900 overflow-hidden">
+      <Sidebar/>
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header/>
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+          <Outlet />
+        </main>
+
+        <Footer />
+      </div>
+    </div>
   );
 };
 

@@ -1,17 +1,12 @@
-import React from 'react';
-import { MenuIcon, SearchIcon } from './Icons';
-import UserDropdown from './UserDropdown';
+import React from "react";
+import { MenuIcon, SearchIcon } from "./Icons";
+import UserDropdown from "./UserDropdown";
 
-interface HeaderProps {
-    toggleSidebar: () => void;
-    onNavigate: (page: 'settings' | 'login') => void;
-}
-
-const Header: React.FC<HeaderProps> = ({ toggleSidebar, onNavigate }) => {
+const Header: React.FC = () => {
   return (
     <header className="flex-shrink-0 bg-slate-800/30 backdrop-blur-sm border-b border-slate-700 flex items-center justify-between p-4">
       <div className="flex items-center gap-4">
-        <button onClick={toggleSidebar} className="lg:hidden p-2 rounded-md text-slate-400 hover:bg-slate-700/50 hover:text-slate-200">
+        <button className="lg:hidden p-2 rounded-md text-slate-400 hover:bg-slate-700/50 hover:text-slate-200">
           <MenuIcon className="w-6 h-6" />
         </button>
         <div className="relative">
@@ -24,7 +19,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, onNavigate }) => {
         </div>
       </div>
       <div className="flex items-center gap-4">
-        <UserDropdown onNavigate={onNavigate} />
+        <UserDropdown />
       </div>
     </header>
   );
