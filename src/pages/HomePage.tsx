@@ -12,7 +12,7 @@ const HomePage: React.FC = () => {
   const listContainerClass = "space-y-2";
   return (
     <>
-      <div className="space-y-6 h-full relative">
+      <div className="space-y-6 h-full">
         <div className="flex justify-between items-center">
           <Breadcrumbs />
           <div className="flex items-center gap-2 p-1 bg-slate-800 rounded-lg">

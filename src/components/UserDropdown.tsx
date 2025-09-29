@@ -28,7 +28,7 @@ const UserDropdown = () => {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-md shadow-lg py-2 z-50 animate-fade-in-fast">
+        <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-md shadow-lg py-2 z-999 animate-fade-in-fast">
           <a className="flex items-center gap-3 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 cursor-pointer">
             <SettingsIcon className="w-4 h-4 text-slate-400" />
             <span>Settings</span>
