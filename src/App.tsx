@@ -5,8 +5,6 @@ import ghostDriveApi from "./apis/ghost-drive-api";
 import { useEffect } from "react";
 import { ACCESS_TOKEN_KEY } from "./constants";
 
-
-
 function App() {
   const { setUser } = useUserStore();
   const fetchUserInfo = async () => {
@@ -16,6 +14,7 @@ function App() {
         return;
       }
       const user = await ghostDriveApi.user.getUserInfo();
+      console.log(user);
       setUser(user);
     } catch (error) {
       console.error(error);

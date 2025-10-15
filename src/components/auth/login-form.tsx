@@ -11,21 +11,43 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Lock, Mail } from "lucide-react";
+import { Lock, User } from "lucide-react";
+import ghostDriveApi from "@/apis/ghost-drive-api";
+import { ACCESS_TOKEN_KEY } from "@/constants";
+import { useNavigate } from "react-router";
+import useUserStore from "@/store/user";
 
 export function LoginForm() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const { setUser } = useUserStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    // TODO: Implement actual login logic with your Elysia backend
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    setIsLoading(false);
+    try {
+      e.preventDefault();
+      setIsLoading(true);
+      const response = await ghostDriveApi.user.login({
+        username,
+        password,
+      });
+      localStorage.setItem(ACCESS_TOKEN_KEY, response.jwt);
+      setUser({
+        id: response.user.id,
+        bucketName: response.user.bucketName,
+        aesKeyEncrypted: response.user.aesKeyEncrypted || "",
+        role: response.user.role,
+        username: response.user.username,
+      });
+      navigate("/");
+      setIsLoading(false);
+    } catch (error) {
+      setIsLoading(false);
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -41,13 +63,13 @@ export function LoginForm() {
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <div className="relative">
-              <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-                id="email"
-                type="email"
+                id="username"
+                type="text"
                 placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="pl-10"
                 required
               />

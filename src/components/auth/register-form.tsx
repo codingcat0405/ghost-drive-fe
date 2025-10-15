@@ -12,19 +12,22 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Lock, Mail, User } from "lucide-react";
+import { Lock, User } from "lucide-react";
+import ghostDriveApi from "@/apis/ghost-drive-api";
+import { ACCESS_TOKEN_KEY } from "@/constants";
+import useUserStore from "@/store/user";
+import { useNavigate } from "react-router";
 
 export function RegisterForm() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
+  const navigate = useNavigate();
+  const { setUser } = useUserStore();
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (password !== confirmPassword) {
       alert("Passwords do not match");
       return;
@@ -34,13 +37,31 @@ export function RegisterForm() {
       alert("Please agree to the terms and conditions");
       return;
     }
-
-    setIsLoading(true);
-
-    // TODO: Implement actual registration logic with your Elysia backend
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    setIsLoading(false);
+    try {
+      setIsLoading(true);
+      await ghostDriveApi.user.register({
+        username,
+        password,
+      });
+      const loginResponse = await ghostDriveApi.user.login({
+        username,
+        password,
+      });
+      localStorage.setItem(ACCESS_TOKEN_KEY, loginResponse.jwt);
+      setUser({
+        id: loginResponse.user.id,
+        bucketName: loginResponse.user.bucketName,
+        aesKeyEncrypted: loginResponse.user.aesKeyEncrypted || "",
+        role: loginResponse.user.role,
+        username: loginResponse.user.username,
+      });
+      navigate("/");
+    } catch (error) {
+      setIsLoading(false);
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -52,31 +73,15 @@ export function RegisterForm() {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Full name</Label>
+            <Label htmlFor="name">Username</Label>
             <div className="relative">
               <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 id="name"
                 type="text"
                 placeholder="John Doe"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="pl-10"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="pl-10"
                 required
               />
