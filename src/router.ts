@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router";
 import { HomePage, LoginPage, RegisterPage } from "./pages";
 import ProtectedPageLayout from "./layout/ProtectedPageLayout";
+import SettingsPage from "./pages/SettingsPage";
 
 const router = createBrowserRouter([
   {
@@ -20,6 +21,10 @@ const router = createBrowserRouter([
   {
     path: "/register",
     Component: RegisterPage,
+  },
+  {
+    path: "/settings",
+    Component: SettingsPage,
   },
 ]);
 
