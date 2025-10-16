@@ -13,6 +13,7 @@ import { useNavigate } from "react-router";
 import { ACCESS_TOKEN_KEY } from "@/constants";
 import useUserStore from "@/store/user";
 import { toast } from "sonner";
+import { UploadDialog } from "../file-management/upload-dialog";
 
 export function DashboardHeader() {
   const navigate = useNavigate();
@@ -27,10 +28,17 @@ export function DashboardHeader() {
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 flex h-16 items-center justify-between">
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
+          <div
+            className="flex items-center gap-2 cursor-pointer"
+            onClick={() => navigate("/")}
+          >
             <div className="w-8 h-8">
               <div className="relative from-primary to-primary/60 rounded-lg  shadow-lg">
-                <img src="/ghostdrive-logo.png" alt="Ghost Drive" className="w-full h-full" />
+                <img
+                  src="/ghostdrive-logo.png"
+                  alt="Ghost Drive"
+                  className="w-full h-full"
+                />
               </div>
             </div>
             <span className="font-bold text-lg">Ghost Drive</span>
@@ -50,11 +58,12 @@ export function DashboardHeader() {
             <Bell className="h-5 w-5" />
             <span className="absolute top-1 right-1 h-2 w-2 bg-primary rounded-full" />
           </Button>
-
-          <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-            <Upload className="h-4 w-4 mr-2" />
-            Upload
-          </Button>
+          <UploadDialog>
+            <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+              <Upload className="h-4 w-4 mr-2" />
+              Upload
+            </Button>
+          </UploadDialog>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

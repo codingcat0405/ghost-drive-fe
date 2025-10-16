@@ -1,6 +1,6 @@
 import type React from "react";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,14 +15,15 @@ import { Upload, FileIcon, X, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import useUserStore from "@/store/user";
-import DecryptPinDiaglog from "../DecryptPinDiaglog";
+import usePinDialogStore from "@/store/pinDialog";
 
 export function UploadDialog({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [decryptPinOpen, setDecryptPinOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const {user} = useUserStore();
+  const [shouldAutoOpen, setShouldAutoOpen] = useState(false);
+  const { user } = useUserStore();
+  const { setOpen: setOpenPinDialog } = usePinDialogStore();
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -48,22 +49,35 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
   };
-  const handleDecryptAesKey = async () => {
-    setDecryptPinOpen(true);
-  }
+
   const handleUpload = async () => {
     if (!file) {
       toast.error("Please select a file");
       return;
     }
-    if(!user.aesKeyPlain) {
-      console.log("Decrypting AES key");
-      await handleDecryptAesKey();
-    }
   };
 
+  const handleDialogOpenChange = (newOpen: boolean) => {
+    if (newOpen && !user.aesKeyPlain) {
+      // If user doesn't have aesKeyPlain, show PIN dialog instead
+      setOpenPinDialog(true);
+      setShouldAutoOpen(true); // Mark that we should auto-open after PIN
+      return;
+    }
+    setOpen(newOpen);
+    setShouldAutoOpen(false); // Reset auto-open flag when manually closed
+  };
+
+  // Auto-open upload dialog when aesKeyPlain becomes available (only if we should)
+  useEffect(() => {
+    if (user.aesKeyPlain && shouldAutoOpen && !open) {
+      setOpen(true);
+      setShouldAutoOpen(false);
+    }
+  }, [user.aesKeyPlain, shouldAutoOpen, open]);
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
@@ -139,7 +153,6 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
           </Button>
         </div>
       </DialogContent>
-      <DecryptPinDiaglog open={decryptPinOpen} setOpen={setDecryptPinOpen} />
     </Dialog>
   );
 }

@@ -16,6 +16,7 @@ import ghostDriveApi from "@/apis/ghost-drive-api";
 import { ACCESS_TOKEN_KEY } from "@/constants";
 import { useNavigate } from "react-router";
 import useUserStore from "@/store/user";
+import { toast } from "sonner";
 
 export function LoginForm() {
   const [username, setUsername] = useState("");
@@ -39,11 +40,12 @@ export function LoginForm() {
         aesKeyEncrypted: response.user.aesKeyEncrypted || "",
         role: response.user.role,
         username: response.user.username,
+        avatar: response.user.avatar,
       });
+      toast.success("Login successful");
       navigate("/");
-      setIsLoading(false);
-    } catch (error) {
-      setIsLoading(false);
+    } catch (error: any) {
+      toast.error(error.message);
       console.error(error);
     } finally {
       setIsLoading(false);

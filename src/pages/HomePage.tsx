@@ -2,6 +2,7 @@ import { FileGrid } from "@/components/dashboard/file-grid";
 import { StorageBar } from "@/components/dashboard/storage-bar";
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import CreatePinDialog from "@/components/CreatePinDialog";
+import DecryptPinDialog from "@/components/DecryptPinDialog";
 
 export default function DashboardPage() {
   return (
@@ -16,6 +17,7 @@ export default function DashboardPage() {
         <FileGrid />
       </main>
       <CreatePinDialog />
+      <DecryptPinDialog />
     </div>
   );
 }

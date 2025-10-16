@@ -1,6 +1,5 @@
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -27,8 +26,7 @@ const CreatePinDialog: React.FC = () => {
   const { user, setUser } = useUserStore();
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const handleCreatePin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleCreatePin = async () => {
     if (pin !== confirmPin) {
       toast.error("PINs do not match");
       return;
@@ -49,9 +47,10 @@ const CreatePinDialog: React.FC = () => {
         aesKeyPlain: aesKey,
       });
       setOpen(false);
-    } catch (error) {
+      toast.success("PIN created successfully");
+    } catch (error: any) {
       console.error(error);
-      toast.error("Failed to create PIN");
+      toast.error(error.message);
       setIsLoading(false);
     } finally {
       setIsLoading(false);
@@ -63,67 +62,62 @@ const CreatePinDialog: React.FC = () => {
     }
   }, [user]);
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <form onSubmit={handleCreatePin}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Enter your PIN</DialogTitle>
-            <DialogDescription>
-              We use this PIN to encrypt and decrypt your files. We don't save
-              your PIN in our database. So if you forget this PIN say "bye bye"
-              to all your files.
-            </DialogDescription>
-          </DialogHeader>
+    <Dialog open={open}>
+      <DialogContent showCloseButton={false} className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Create your PIN</DialogTitle>
+          <DialogDescription>
+            You need provide a PIN to use this App. We will not save your PIN in
+            our database.
+            <br /> So if you forget this PIN we can'trecover your files.
+          </DialogDescription>
+        </DialogHeader>
 
-          <div className="flex justify-between items-center gap-2">
-            <Label>PIN</Label>
-            <InputOTP
-              type="password"
-              maxLength={6}
-              pattern={REGEXP_ONLY_DIGITS}
-              value={pin}
-              onChange={setPin}
-            >
-              <InputOTPGroup>
-                <InputOTPSlot index={0} type="password" />
-                <InputOTPSlot index={1} type="password" />
-                <InputOTPSlot index={2} type="password" />
-                <InputOTPSlot index={3} type="password" />
-                <InputOTPSlot index={4} type="password" />
-                <InputOTPSlot index={5} type="password" />
-              </InputOTPGroup>
-            </InputOTP>
-          </div>
-          <div className="flex justify-between items-center gap-2">
-            <Label>Confirm PIN</Label>
+        <div className="flex justify-between items-center gap-2">
+          <Label>PIN</Label>
+          <InputOTP
+            type="password"
+            maxLength={6}
+            pattern={REGEXP_ONLY_DIGITS}
+            value={pin}
+            onChange={setPin}
+          >
+            <InputOTPGroup>
+              <InputOTPSlot index={0} type="password" />
+              <InputOTPSlot index={1} type="password" />
+              <InputOTPSlot index={2} type="password" />
+              <InputOTPSlot index={3} type="password" />
+              <InputOTPSlot index={4} type="password" />
+              <InputOTPSlot index={5} type="password" />
+            </InputOTPGroup>
+          </InputOTP>
+        </div>
+        <div className="flex justify-between items-center gap-2">
+          <Label>Confirm PIN</Label>
 
-            <InputOTP
-              type="password"
-              maxLength={6}
-              pattern={REGEXP_ONLY_DIGITS}
-              value={confirmPin}
-              onChange={setConfirmPin}
-            >
-              <InputOTPGroup>
-                <InputOTPSlot index={0} type="password" />
-                <InputOTPSlot index={1} type="password" />
-                <InputOTPSlot index={2} type="password" />
-                <InputOTPSlot index={3} type="password" />
-                <InputOTPSlot index={4} type="password" />
-                <InputOTPSlot index={5} type="password" />
-              </InputOTPGroup>
-            </InputOTP>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
-            </DialogClose>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Creating PIN..." : "Confirm"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </form>
+          <InputOTP
+            type="password"
+            maxLength={6}
+            pattern={REGEXP_ONLY_DIGITS}
+            value={confirmPin}
+            onChange={setConfirmPin}
+          >
+            <InputOTPGroup>
+              <InputOTPSlot index={0} type="password" />
+              <InputOTPSlot index={1} type="password" />
+              <InputOTPSlot index={2} type="password" />
+              <InputOTPSlot index={3} type="password" />
+              <InputOTPSlot index={4} type="password" />
+              <InputOTPSlot index={5} type="password" />
+            </InputOTPGroup>
+          </InputOTP>
+        </div>
+        <DialogFooter>
+          <Button onClick={handleCreatePin} disabled={isLoading}>
+            {isLoading ? "Creating PIN..." : "Confirm"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
   );
 };
