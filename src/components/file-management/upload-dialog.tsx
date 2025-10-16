@@ -14,11 +14,15 @@ import { Progress } from "@/components/ui/progress";
 import { Upload, FileIcon, X, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import useUserStore from "@/store/user";
+import DecryptPinDiaglog from "../DecryptPinDiaglog";
 
 export function UploadDialog({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [decryptPinOpen, setDecryptPinOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const {user} = useUserStore();
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -44,10 +48,17 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
   };
+  const handleDecryptAesKey = async () => {
+    setDecryptPinOpen(true);
+  }
   const handleUpload = async () => {
     if (!file) {
       toast.error("Please select a file");
       return;
+    }
+    if(!user.aesKeyPlain) {
+      console.log("Decrypting AES key");
+      await handleDecryptAesKey();
     }
   };
 
@@ -128,6 +139,7 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
           </Button>
         </div>
       </DialogContent>
+      <DecryptPinDiaglog open={decryptPinOpen} setOpen={setDecryptPinOpen} />
     </Dialog>
   );
 }

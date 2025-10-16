@@ -27,7 +27,8 @@ const CreatePinDialog: React.FC = () => {
   const { user, setUser } = useUserStore();
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const handleCreatePin = async () => {
+  const handleCreatePin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     if (pin !== confirmPin) {
       toast.error("PINs do not match");
       return;
@@ -63,7 +64,7 @@ const CreatePinDialog: React.FC = () => {
   }, [user]);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <form>
+      <form onSubmit={handleCreatePin}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Enter your PIN</DialogTitle>
@@ -117,7 +118,7 @@ const CreatePinDialog: React.FC = () => {
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
-            <Button onClick={handleCreatePin} disabled={isLoading}>
+            <Button type="submit" disabled={isLoading}>
               {isLoading ? "Creating PIN..." : "Confirm"}
             </Button>
           </DialogFooter>
