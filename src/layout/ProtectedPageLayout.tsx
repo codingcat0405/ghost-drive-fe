@@ -1,7 +1,7 @@
 import { Outlet, useLocation, useNavigate } from "react-router";
-import "./globals.css";
 import { useEffect } from "react";
 import { ACCESS_TOKEN_KEY } from "@/constants";
+import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 
 const ProtectedPageLayout = () => {
   const navigate = useNavigate();
@@ -14,7 +14,12 @@ const ProtectedPageLayout = () => {
       navigate("/login");
     }
   }, [pathname.pathname]);
-  return <Outlet />;
+  return (
+    <div className="min-h-screen bg-background">
+      <DashboardHeader />
+      <Outlet />
+    </div>
+  );
 };
 
 export default ProtectedPageLayout;

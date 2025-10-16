@@ -4,12 +4,15 @@ import useUserStore from "./store/user";
 import ghostDriveApi from "./apis/ghost-drive-api";
 import { useEffect } from "react";
 import { ACCESS_TOKEN_KEY } from "./constants";
+import { Toaster } from "./components/ui/sonner";
 
 function App() {
   const { setUser } = useUserStore();
   const fetchUserInfo = async () => {
     try {
       const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+      console.log("access token", accessToken);
+
       if (!accessToken) {
         return;
       }
@@ -26,6 +29,7 @@ function App() {
   return (
     <>
       <RouterProvider router={router} />
+      <Toaster position="top-center" theme="dark" />
     </>
   );
 }
