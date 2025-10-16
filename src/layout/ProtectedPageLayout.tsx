@@ -6,7 +6,6 @@ import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 const ProtectedPageLayout = () => {
   const navigate = useNavigate();
   const pathname = useLocation();
-  console.log(pathname);
 
   useEffect(() => {
     const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);

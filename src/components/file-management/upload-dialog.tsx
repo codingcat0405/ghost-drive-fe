@@ -13,17 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileIcon, X, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface UploadFile {
-  id: string;
-  file: File;
-  progress: number;
-  status: "pending" | "uploading" | "complete" | "error";
-}
+import { toast } from "sonner";
 
 export function UploadDialog({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [files, setFiles] = useState<UploadFile[]>([]);
+  const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -31,62 +25,16 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
     setIsDragging(false);
 
     const droppedFiles = Array.from(e.dataTransfer.files);
-    addFiles(droppedFiles);
+    if (droppedFiles.length > 0) {
+      setFile(droppedFiles[0]); // Only take the first file
+    }
   }, []);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const selectedFiles = Array.from(e.target.files);
-      addFiles(selectedFiles);
+    if (e.target.files && e.target.files.length > 0) {
+      setFile(e.target.files[0]); // Only take the first file
+      e.target.value = "";
     }
-  };
-
-  const addFiles = (newFiles: File[]) => {
-    const uploadFiles: UploadFile[] = newFiles.map((file) => ({
-      id: Math.random().toString(36).substr(2, 9),
-      file,
-      progress: 0,
-      status: "pending" as const,
-    }));
-
-    setFiles((prev) => [...prev, ...uploadFiles]);
-
-    // Simulate upload
-    uploadFiles.forEach((uploadFile) => {
-      simulateUpload(uploadFile.id);
-    });
-  };
-
-  const simulateUpload = (fileId: string) => {
-    setFiles((prev) =>
-      prev.map((f) =>
-        f.id === fileId ? { ...f, status: "uploading" as const } : f
-      )
-    );
-
-    const interval = setInterval(() => {
-      setFiles((prev) => {
-        const file = prev.find((f) => f.id === fileId);
-        if (!file || file.progress >= 100) {
-          clearInterval(interval);
-          return prev.map((f) =>
-            f.id === fileId
-              ? { ...f, progress: 100, status: "complete" as const }
-              : f
-          );
-        }
-
-        return prev.map((f) =>
-          f.id === fileId
-            ? { ...f, progress: Math.min(f.progress + 10, 100) }
-            : f
-        );
-      });
-    }, 200);
-  };
-
-  const removeFile = (fileId: string) => {
-    setFiles((prev) => prev.filter((f) => f.id !== fileId));
   };
 
   const formatFileSize = (bytes: number) => {
@@ -96,15 +44,21 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
   };
+  const handleUpload = async () => {
+    if (!file) {
+      toast.error("Please select a file");
+      return;
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Upload Files</DialogTitle>
+          <DialogTitle>Upload File</DialogTitle>
           <DialogDescription>
-            Your files will be encrypted before upload. Maximum file size: 5GB
+            Your file will be encrypted before upload. Maximum file size: 5GB
           </DialogDescription>
         </DialogHeader>
 
@@ -121,65 +75,54 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
           onDragLeave={() => setIsDragging(false)}
         >
           <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-lg font-semibold mb-2">Drop files here</h3>
+          <h3 className="text-lg font-semibold mb-2">Drop file here</h3>
           <p className="text-sm text-muted-foreground mb-4">
             or click to browse
           </p>
           <input
             type="file"
-            multiple
             onChange={handleFileInput}
             className="hidden"
             id="file-upload"
           />
           <Button asChild variant="outline">
             <label htmlFor="file-upload" className="cursor-pointer">
-              Select Files
+              Select File
             </label>
           </Button>
         </div>
 
-        {files.length > 0 && (
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {files.map((uploadFile) => (
-              <div
-                key={uploadFile.id}
-                className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border/50"
-              >
-                <FileIcon className="h-8 w-8 text-primary flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-medium truncate">
-                      {uploadFile.file.name}
-                    </p>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 flex-shrink-0"
-                      onClick={() => removeFile(uploadFile.id)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                    <span>{formatFileSize(uploadFile.file.size)}</span>
-                    {uploadFile.status === "complete" && (
-                      <span className="flex items-center gap-1 text-primary">
-                        <Lock className="h-3 w-3" />
-                        Encrypted
-                      </span>
-                    )}
-                  </div>
-                  {uploadFile.status !== "complete" && (
-                    <Progress value={uploadFile.progress} className="h-1" />
-                  )}
+        {file && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border/50">
+              <FileIcon className="h-8 w-8 text-primary flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-sm font-medium truncate">{file.name}</p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 flex-shrink-0"
+                    onClick={() => setFile(null)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                  <span>{formatFileSize(file.size)}</span>
+                  <span className="flex items-center gap-1 text-primary">
+                    <Lock className="h-3 w-3" />
+                    Encrypted
+                  </span>
+                </div>
+                <Progress value={20} className="h-1" />
               </div>
-            ))}
+            </div>
           </div>
         )}
 
         <div className="flex justify-end gap-2">
+          <Button onClick={handleUpload}>Upload</Button>
           <Button variant="outline" onClick={() => setOpen(false)}>
             Close
           </Button>

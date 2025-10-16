@@ -13,6 +13,7 @@ export type User = {
   role: string,
   bucketName:string,
   aesKeyEncrypted: string,
+  aesKeyPlain?: string,
 }
 
 const defaultUser: User = {
@@ -21,7 +22,8 @@ const defaultUser: User = {
   avatar: '',
   role: 'user',
   bucketName: '',
-  aesKeyEncrypted: ''
+  aesKeyEncrypted: '',
+  aesKeyPlain: ''
 }
 const useUserStore = create<UserStore>((set) => ({
   user: defaultUser,

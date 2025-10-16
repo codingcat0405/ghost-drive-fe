@@ -22,7 +22,16 @@ import {
   Grid3x3,
   List,
   Clock,
+  SlashIcon,
 } from "lucide-react";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbSeparator,
+} from "../ui/breadcrumb";
+import { Link } from "react-router";
 
 type ViewMode = "grid" | "list";
 
@@ -35,69 +44,7 @@ interface FileItem {
   encrypted: boolean;
 }
 
-const mockFiles: FileItem[] = [
-  {
-    id: "1",
-    name: "Work Documents",
-    type: "folder",
-    modified: "2 days ago",
-    encrypted: true,
-  },
-  {
-    id: "2",
-    name: "Personal Photos",
-    type: "folder",
-    modified: "1 week ago",
-    encrypted: true,
-  },
-  {
-    id: "3",
-    name: "Project Proposal.pdf",
-    type: "document",
-    size: "2.4 MB",
-    modified: "3 hours ago",
-    encrypted: true,
-  },
-  {
-    id: "4",
-    name: "Vacation 2024.jpg",
-    type: "image",
-    size: "5.1 MB",
-    modified: "1 day ago",
-    encrypted: true,
-  },
-  {
-    id: "5",
-    name: "Meeting Recording.mp4",
-    type: "video",
-    size: "124 MB",
-    modified: "5 days ago",
-    encrypted: true,
-  },
-  {
-    id: "6",
-    name: "Podcast Episode.mp3",
-    type: "audio",
-    size: "45 MB",
-    modified: "1 week ago",
-    encrypted: true,
-  },
-  {
-    id: "7",
-    name: "Budget 2024.xlsx",
-    type: "document",
-    size: "890 KB",
-    modified: "2 days ago",
-    encrypted: true,
-  },
-  {
-    id: "8",
-    name: "Design Assets",
-    type: "folder",
-    modified: "3 days ago",
-    encrypted: true,
-  },
-];
+const mockFiles: FileItem[] = [];
 
 function getFileIcon(type: FileItem["type"]) {
   switch (type) {
@@ -144,7 +91,18 @@ export function FileGrid() {
           </Button>
         </div>
       </div>
-
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link to="/">Your Drive</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator>
+            <SlashIcon />
+          </BreadcrumbSeparator>
+        </BreadcrumbList>
+      </Breadcrumb>
       {viewMode === "grid" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {mockFiles.map((file) => (

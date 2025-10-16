@@ -184,7 +184,7 @@ const encryptAndUploadSmall = async (
   onProgress?.({ stage: 'uploading', percentage: 50 });
 
   // Get presigned URL and upload
-  const { uploadUrl } = await ghostDriveApi.user.getUploadUrl(objectKey);
+  const { uploadUrl } = await ghostDriveApi.file.getUploadUrl(objectKey);
 
   await fetch(uploadUrl, {
     method: 'PUT',
@@ -209,7 +209,7 @@ const encryptAndUploadLarge = async (
 
   try {
     // Initialize multipart upload
-    const { uploadId, objectName, partUrls } = await ghostDriveApi.user.getUploadMultipartUrl(
+    const { uploadId, objectName, partUrls } = await ghostDriveApi.file.getUploadMultipartUrl(
       objectKey,
       totalChunks
     );
@@ -293,7 +293,7 @@ const encryptAndUploadLarge = async (
 
     // Complete multipart upload
     encryptedParts.sort((a, b) => a.PartNumber - b.PartNumber);
-    await ghostDriveApi.user.completeUploadMultipart(objectName, uploadId, encryptedParts);
+    await ghostDriveApi.file.completeUploadMultipart(objectName, uploadId, encryptedParts);
 
   } finally {
     workers.forEach(w => w.terminate());
@@ -331,7 +331,7 @@ const decryptAndDownloadSmall = async (
     onProgress?.({ stage: 'downloading', percentage: 0 });
 
     // Download encrypted file
-    const { downloadUrl } = await ghostDriveApi.user.getDownloadUrl(objectKey);
+    const { downloadUrl } = await ghostDriveApi.file.getDownloadUrl(objectKey);
     console.log('Downloading from URL:', downloadUrl);
 
     const response = await fetch(downloadUrl);
@@ -402,7 +402,7 @@ const decryptAndDownloadLarge = async (
   const workers = createWorkerPool(workerCount);
 
   try {
-    const { downloadUrl } = await ghostDriveApi.user.getDownloadUrl(objectKey);
+    const { downloadUrl } = await ghostDriveApi.file.getDownloadUrl(objectKey);
 
     const decryptedChunks: Blob[] = [];
     let currentWorkerIndex = 0;
