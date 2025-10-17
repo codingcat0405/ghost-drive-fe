@@ -56,11 +56,13 @@ const ghostDriveApi = {
     }> => {
       return await axiosClient.get("/files", { params });
     },
+  },
+  upload: {
     getUploadUrl: (objectKey: string): Promise<{ uploadUrl: string }> => {
-      return axiosClient.post(`/files/upload-url`, { objectKey });
+      return axiosClient.post(`/upload/upload-url`, { objectKey });
     },
     getDownloadUrl: (objectKey: string): Promise<{ downloadUrl: string }> => {
-      return axiosClient.post(`/files/download-url`, { objectKey });
+      return axiosClient.post(`/upload/download-url`, { objectKey });
     },
     getUploadMultipartUrl: (objectKey: string, totalChunks: number): Promise<{
       uploadId: string;
@@ -68,10 +70,10 @@ const ghostDriveApi = {
       objectName: string;
       partUrls: Array<{ partNumber: number; url: string }>;
     }> => {
-      return axiosClient.post(`/files/upload-multipart-url`, { objectKey, totalChunks });
+      return axiosClient.post(`/upload/upload-multipart-url`, { objectKey, totalChunks });
     },
     completeUploadMultipart: (objectName: string, uploadId: string, parts: Array<{ PartNumber: number; ETag: string }>): Promise<void> => {
-      return axiosClient.post(`/files/complete-multipart-upload`, { objectKey: objectName, uploadId, parts });
+      return axiosClient.post(`/upload/complete-multipart-upload`, { objectKey: objectName, uploadId, parts });
     },
   }
 };

@@ -27,7 +27,7 @@ const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
 
 const stringToArrayBuffer = (str: string): ArrayBuffer => {
   const encoder = new TextEncoder();
-  return encoder.encode(str);
+  return encoder.encode(str).buffer;
 };
 
 const hashPin = async (pin: string): Promise<ArrayBuffer> => {
@@ -184,7 +184,7 @@ const encryptAndUploadSmall = async (
   onProgress?.({ stage: 'uploading', percentage: 50 });
 
   // Get presigned URL and upload
-  const { uploadUrl } = await ghostDriveApi.file.getUploadUrl(objectKey);
+  const { uploadUrl } = await ghostDriveApi.upload.getUploadUrl(objectKey);
 
   await fetch(uploadUrl, {
     method: 'PUT',
@@ -209,7 +209,7 @@ const encryptAndUploadLarge = async (
 
   try {
     // Initialize multipart upload
-    const { uploadId, objectName, partUrls } = await ghostDriveApi.file.getUploadMultipartUrl(
+    const { uploadId, objectName, partUrls } = await ghostDriveApi.upload.getUploadMultipartUrl(
       objectKey,
       totalChunks
     );
@@ -293,7 +293,7 @@ const encryptAndUploadLarge = async (
 
     // Complete multipart upload
     encryptedParts.sort((a, b) => a.PartNumber - b.PartNumber);
-    await ghostDriveApi.file.completeUploadMultipart(objectName, uploadId, encryptedParts);
+    await ghostDriveApi.upload.completeUploadMultipart(objectName, uploadId, encryptedParts);
 
   } finally {
     workers.forEach(w => w.terminate());
@@ -331,7 +331,7 @@ const decryptAndDownloadSmall = async (
     onProgress?.({ stage: 'downloading', percentage: 0 });
 
     // Download encrypted file
-    const { downloadUrl } = await ghostDriveApi.file.getDownloadUrl(objectKey);
+    const { downloadUrl } = await ghostDriveApi.upload.getDownloadUrl(objectKey);
     console.log('Downloading from URL:', downloadUrl);
 
     const response = await fetch(downloadUrl);
@@ -402,7 +402,7 @@ const decryptAndDownloadLarge = async (
   const workers = createWorkerPool(workerCount);
 
   try {
-    const { downloadUrl } = await ghostDriveApi.file.getDownloadUrl(objectKey);
+    const { downloadUrl } = await ghostDriveApi.upload.getDownloadUrl(objectKey);
 
     const decryptedChunks: Blob[] = [];
     let currentWorkerIndex = 0;
