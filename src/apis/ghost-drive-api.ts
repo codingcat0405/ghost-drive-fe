@@ -1,5 +1,18 @@
 import type { User } from "../store/user";
 import axiosClient from "./axios-client";
+export interface FolderContentItem {
+  id: number;
+  createdAt: string;
+  updatedAt: string;
+  name: string;
+  objectKey?: string;
+  folderId?: number;
+  size: number;
+  mimeType?: string;
+  userId: number;
+  parentId?: number;
+
+}
 
 const ghostDriveApi = {
   user: {
@@ -27,14 +40,14 @@ const ghostDriveApi = {
     createFileEntry: async (data: {
       name: string,
       objectKey: string,
-      path: string,
+      folderId?: number,
       size: number,
       mimeType: string
     }) => {
       return await axiosClient.post("/files", data);
     },
     getFiles: async (params: {
-      path?: string;
+      folderId?: number;
       page?: number;
       limit?: number;
     }): Promise<{
@@ -44,7 +57,7 @@ const ghostDriveApi = {
         updatedAt: string;
         name: string;
         objectKey: string;
-        path: string;
+        folderId: number;
         size: number;
         mimeType: string;
         userId: number;
@@ -56,6 +69,7 @@ const ghostDriveApi = {
     }> => {
       return await axiosClient.get("/files", { params });
     },
+
   },
   upload: {
     getUploadUrl: (objectKey: string): Promise<{ uploadUrl: string }> => {
@@ -74,6 +88,69 @@ const ghostDriveApi = {
     },
     completeUploadMultipart: (objectName: string, uploadId: string, parts: Array<{ PartNumber: number; ETag: string }>): Promise<void> => {
       return axiosClient.post(`/upload/complete-multipart-upload`, { objectKey: objectName, uploadId, parts });
+    },
+  },
+  folder: {
+    getFolders: async (params: {
+      parentId?: number;
+      page?: number;
+      limit?: number;
+    }): Promise<{
+      contents: {
+        id: number;
+        name: string;
+        parentId: number;
+        createdAt: string;
+        updatedAt: string;
+        userId: number;
+      }[],
+      currentPage: number;
+      perPage: number;
+      totalPage: number;
+      totalElements: number;
+    }> => {
+      return await axiosClient.get("/folders", { params });
+    },
+    createFolder: async (data: {
+      name: string;
+      parentId?: number;
+    }): Promise<void> => {
+      return await axiosClient.post("/folders", data);
+    },
+    deleteFolder: async (id: number): Promise<void> => {
+      return await axiosClient.delete(`/folders/${id}`);
+    },
+    updateFolder: async (id: number, data: {
+      name: string;
+    }): Promise<void> => {
+      return await axiosClient.put(`/folders/${id}`, data);
+    },
+    contents: async (params: {
+      folderId?: number;
+      page?: number;
+      limit?: number;
+    }): Promise<{
+      contents: FolderContentItem[];
+      currentPage: number;
+      perPage: number;
+      totalPage: number;
+      totalElements: number;
+    }> => {
+      return await axiosClient.get("/folders/contents", { params });
+    },
+    getParentTree: async (params: {
+      folderId?: number;
+    }): Promise<
+      {
+        id: number;
+        name: string;
+        parentId: number;
+        userId: number;
+        createdAt: string;
+        updatedAt: string;
+      }[]
+    > => {
+      return await axiosClient.get(`/folders/tree`, { params });
     },
   }
 };

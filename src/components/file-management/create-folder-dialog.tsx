@@ -14,6 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Folder } from "lucide-react";
+import { toast } from "sonner";
+import ghostDriveApi from "@/apis/ghost-drive-api";
+import { useSearchParams } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function CreateFolderDialog({
   children,
@@ -23,18 +27,33 @@ export function CreateFolderDialog({
   const [open, setOpen] = useState(false);
   const [folderName, setFolderName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  //get current folder id from url
+  const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
 
   const handleCreate = async () => {
     if (!folderName.trim()) return;
 
-    setIsCreating(true);
+    try {
+      setIsCreating(true);
+      const currentFolderId = searchParams.get("folder")
+        ? parseInt(searchParams.get("folder")!)
+        : undefined;
+      await ghostDriveApi.folder.createFolder({
+        name: folderName,
+        parentId: currentFolderId,
+      });
 
-    // TODO: Implement actual folder creation with your Elysia backend
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    setIsCreating(false);
-    setFolderName("");
-    setOpen(false);
+      setFolderName("");
+      setOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["folder-contents"] });
+      toast.success("Folder created successfully");
+    } catch (error: any) {
+      console.error("Failed to create folder:", error);
+      toast.error(error.message);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (

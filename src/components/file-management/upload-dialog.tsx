@@ -16,10 +16,11 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import useUserStore from "@/store/user";
 import usePinDialogStore from "@/store/pinDialog";
-import { sanitizeFileName } from "@/utils/common";
+import { sanitizeFileName, shortenFileName } from "@/utils/common";
 import cryptoUtils from "@/utils/crypto";
 import ghostDriveApi from "@/apis/ghost-drive-api";
 import { useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router";
 
 export function UploadDialog({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -34,7 +35,7 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
     stage: "",
   });
   const [uploading, setUploading] = useState(false);
-
+  const [searchParams] = useSearchParams();
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -73,12 +74,15 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
     console.log("file", file);
 
     try {
+      const currentFolderId = searchParams.get("folder")
+        ? parseInt(searchParams.get("folder")!)
+        : undefined;
       await ghostDriveApi.file.createFileEntry({
         name: file.name,
         objectKey,
         size: file.size,
         mimeType: file.type ?? "application/octet-stream",
-        path: "/",
+        folderId: currentFolderId,
       });
       await cryptoUtils.encryptAndUpload(
         file,
@@ -100,7 +104,7 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
               stage: "",
             });
             // Invalidate and refetch the files query to update the file grid
-            queryClient.invalidateQueries({ queryKey: ["list-files"] });
+            queryClient.invalidateQueries({ queryKey: ["folder-contents"] });
             setOpen(false);
           }
         }
@@ -178,7 +182,7 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
               <FileIcon className="h-8 w-8 text-primary flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
-                  <p className="text-sm font-medium truncate">{file.name}</p>
+                  <p className="text-sm font-medium truncate">{shortenFileName(file.name)}</p>
                   <Button
                     variant="ghost"
                     size="icon"

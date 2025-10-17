@@ -29,9 +29,10 @@ import {
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
+  BreadcrumbPage,
   BreadcrumbSeparator,
 } from "../ui/breadcrumb";
-import { Link, useSearchParams } from "react-router";
+import { useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import ghostDriveApi from "@/apis/ghost-drive-api";
 import {
@@ -43,10 +44,12 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "../ui/pagination";
+import moment from "moment";
 
 type ViewMode = "grid" | "list";
 
 interface FileItem {
+  key: number;
   id: string;
   name: string;
   type: string;
@@ -75,7 +78,7 @@ function getFileIcon(mimeType: string) {
   ) {
     return <FileText className="h-8 w-8 text-blue-500" />;
   }
-  if(mimeType === "folder") {
+  if (mimeType === "folder") {
     return <Folder className="h-8 w-8 text-primary" />;
   }
   // For folders, you'll need to handle separately since folders don't have MIME types
@@ -87,43 +90,63 @@ export function FileGrid() {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Get page from URL or default to 1
+  // Get page and folder from URL or default values
   const currentPage = parseInt(searchParams.get("page") || "1", 10);
+  const currentFolderId = searchParams.get("folder") || undefined;
 
-  const [fileParams, setFileParams] = useState({
-    path: "/",
+  const [params, setParams] = useState({
+    folderId: currentFolderId ? parseInt(currentFolderId) : undefined,
     page: currentPage,
-    limit: 10,
+    limit: 9,
   });
 
-  // Update fileParams when URL page changes
+  // Update fileParams when URL changes
   useEffect(() => {
-    setFileParams((prev) => ({ ...prev, page: currentPage }));
-  }, [currentPage]);
+    setParams((prev) => ({
+      ...prev,
+      page: currentPage,
+      folderId: currentFolderId ? parseInt(currentFolderId) : undefined,
+    }));
+  }, [currentPage, currentFolderId]);
 
-  const { data: fileData, isLoading } = useQuery({
-    queryKey: ["list-files", fileParams],
-    queryFn: ({ queryKey }) => ghostDriveApi.file.getFiles(queryKey[1] as any),
+  const { data: folderContentsData, isLoading } = useQuery({
+    queryKey: ["folder-contents", params],
+    queryFn: ({ queryKey }) =>
+      ghostDriveApi.folder.contents(queryKey[1] as any),
   });
-  const files: FileItem[] = useMemo(() => {
-    const allFiles = fileData?.contents || [];
-    return allFiles.map((file) => ({
-      id: file.id.toString(),
-      name: file.name,
-      type: file.mimeType,
-      size: (file.size / 1024 / 1024).toFixed(2) + " MB",
-      modified: file.createdAt,
+
+  const { data: parentTreeData = [] } = useQuery({
+    queryKey: ["parent-tree", params],
+    queryFn: ({ queryKey }) =>
+      ghostDriveApi.folder.getParentTree({
+        folderId: (queryKey[1] as any).folderId,
+      }),
+  });
+  console.log("parentTreeData", parentTreeData);
+
+  const folderContents: FileItem[] = useMemo(() => {
+    const allContents = folderContentsData?.contents || [];
+
+    return allContents.map((item, index) => ({
+      key: index,
+      id: item.id.toString(),
+      name: item.name,
+      type: item.folderId
+        ? item.mimeType ?? "application/octet-stream"
+        : "folder",
+      size: item.size ? (item.size / 1024 / 1024).toFixed(2) + " MB" : "",
+      modified: moment(item.createdAt).format("DD/MM/YYYY HH:mm:ss"),
       encrypted: true,
     }));
-  }, [fileData]);
+  }, [folderContentsData]);
 
   // Pagination data from API response
-  const paginationData = fileData
+  const paginationData = folderContentsData
     ? {
-        currentPage: fileData.currentPage,
-        totalPages: fileData.totalPage,
-        totalElements: fileData.totalElements,
-        perPage: fileData.perPage,
+        currentPage: folderContentsData.currentPage,
+        totalPages: folderContentsData.totalPage,
+        totalElements: folderContentsData.totalElements,
+        perPage: folderContentsData.perPage,
       }
     : null;
 
@@ -133,6 +156,16 @@ export function FileGrid() {
     setSearchParams((prev) => {
       const newParams = new URLSearchParams(prev);
       newParams.set("page", newPage.toString());
+      return newParams;
+    });
+  };
+
+  // Handle folder navigation
+  const handleFolderClick = (folderId: string) => {
+    setSearchParams((prev) => {
+      const newParams = new URLSearchParams(prev);
+      newParams.set("folder", folderId);
+      newParams.set("page", "1"); // Reset to first page when changing folders
       return newParams;
     });
   };
@@ -170,19 +203,7 @@ export function FileGrid() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">My Files</h2>
-          <p className="text-sm text-muted-foreground">
-            {paginationData
-              ? `Showing ${
-                  (paginationData.currentPage - 1) * paginationData.perPage + 1
-                }-${Math.min(
-                  paginationData.currentPage * paginationData.perPage,
-                  paginationData.totalElements
-                )} of ${paginationData.totalElements} files`
-              : "All your encrypted files in one place"}
-          </p>
-        </div>
+        <h2 className="text-2xl font-bold">My Files</h2>
 
         <div className="flex items-center gap-2">
           <Button
@@ -203,16 +224,56 @@ export function FileGrid() {
       </div>
       <Breadcrumb>
         <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/">Your Drive</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator>
-            <SlashIcon />
-          </BreadcrumbSeparator>
+          {parentTreeData.length === 0 ? (
+            <>
+              <BreadcrumbPage>
+                <BreadcrumbLink>My Drive</BreadcrumbLink>
+              </BreadcrumbPage>
+              <BreadcrumbSeparator>
+                <SlashIcon />
+              </BreadcrumbSeparator>
+            </>
+          ) : (
+            parentTreeData.map((item) => (
+              <>
+                {+item.id === +currentFolderId! ? (
+                  <BreadcrumbItem key={item.id}>
+                    <BreadcrumbPage
+                      onClick={() => handleFolderClick(item.id.toString())}
+                      className="cursor-pointer"
+                    >
+                      {item.name == "/" ? "My Drive" : item.name}
+                    </BreadcrumbPage>
+                  </BreadcrumbItem>
+                ) : (
+                  <BreadcrumbItem key={item.id}>
+                    <BreadcrumbLink
+                      onClick={() => handleFolderClick(item.id.toString())}
+                      className="cursor-pointer"
+                    >
+                      {item.name == "/" ? "My Drive" : item.name}
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                )}
+                <BreadcrumbSeparator>
+                  <SlashIcon />
+                </BreadcrumbSeparator>
+              </>
+            ))
+          )}
         </BreadcrumbList>
       </Breadcrumb>
+      <p className="text-sm text-muted-foreground">
+        {paginationData
+          ? `Showing ${
+              (paginationData.currentPage - 1) * paginationData.perPage + 1
+            }-${Math.min(
+              paginationData.currentPage * paginationData.perPage,
+              paginationData.totalElements
+            )} of ${paginationData.totalElements} files`
+          : "All your encrypted files in one place"}
+      </p>
+
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
@@ -220,7 +281,7 @@ export function FileGrid() {
             <p className="text-muted-foreground">Loading files...</p>
           </div>
         </div>
-      ) : files.length === 0 ? (
+      ) : folderContents.length === 0 ? (
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <Folder className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -232,10 +293,13 @@ export function FileGrid() {
         </div>
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {files?.map((file) => (
+          {folderContents.map((file) => (
             <Card
-              key={file.id}
+              key={file.key}
               className="p-4 hover:bg-accent/50 transition-colors cursor-pointer border-border/50 bg-card/50 group"
+              onClick={() =>
+                file.type === "folder" ? handleFolderClick(file.id) : undefined
+              }
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="p-3 rounded-lg bg-muted/50">
@@ -308,10 +372,15 @@ export function FileGrid() {
       ) : (
         <Card className="border-border/50 bg-card/50">
           <div className="divide-y divide-border/50">
-            {files.map((file) => (
+            {folderContents.map((file) => (
               <div
-                key={file.id}
+                key={file.key}
                 className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors cursor-pointer group"
+                onClick={() =>
+                  file.type === "folder"
+                    ? handleFolderClick(file.id)
+                    : undefined
+                }
               >
                 <div className="flex items-center gap-4 flex-1 min-w-0">
                   <div className="p-2 rounded-lg bg-muted/50">

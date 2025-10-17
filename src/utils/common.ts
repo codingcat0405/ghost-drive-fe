@@ -12,3 +12,8 @@ export const sanitizeFileName = (originalFileName: string) => {
   
   return normalizedFileName;
 }
+
+export const shortenFileName = (fileName: string) => {
+  if (fileName.length <= 20) return fileName;
+  return fileName.slice(0, 16) + '...' + fileName.slice(-4);
+}

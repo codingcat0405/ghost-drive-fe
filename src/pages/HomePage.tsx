@@ -1,5 +1,4 @@
 import { FileGrid } from "@/components/dashboard/file-grid";
-import { StorageBar } from "@/components/dashboard/storage-bar";
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import CreatePinDialog from "@/components/CreatePinDialog";
 import DecryptPinDialog from "@/components/DecryptPinDialog";
@@ -11,7 +10,6 @@ export default function DashboardPage() {
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="flex-1 space-y-6">
             <QuickActions />
-            <StorageBar />
           </div>
         </div>
         <FileGrid />
