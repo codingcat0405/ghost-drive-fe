@@ -16,6 +16,10 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import useUserStore from "@/store/user";
 import usePinDialogStore from "@/store/pinDialog";
+import { sanitizeFileName } from "@/utils/common";
+import cryptoUtils from "@/utils/crypto";
+import ghostDriveApi from "@/apis/ghost-drive-api";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function UploadDialog({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -24,6 +28,12 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
   const [shouldAutoOpen, setShouldAutoOpen] = useState(false);
   const { user } = useUserStore();
   const { setOpen: setOpenPinDialog } = usePinDialogStore();
+  const queryClient = useQueryClient();
+  const [progress, setProgress] = useState({
+    percent: 0,
+    stage: "",
+  });
+  const [uploading, setUploading] = useState(false);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -54,6 +64,51 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
     if (!file) {
       toast.error("Please select a file");
       return;
+    }
+    if (!user.aesKeyPlain) {
+      toast.error("Failed to encrypt file!");
+      return;
+    }
+    const objectKey = sanitizeFileName(file.name);
+    console.log("file", file);
+
+    try {
+      await ghostDriveApi.file.createFileEntry({
+        name: file.name,
+        objectKey,
+        size: file.size,
+        mimeType: file.type ?? "application/octet-stream",
+        path: "/",
+      });
+      await cryptoUtils.encryptAndUpload(
+        file,
+        user.aesKeyPlain,
+        objectKey,
+        (progress) => {
+          console.log(progress);
+
+          setProgress({
+            percent: progress.percentage,
+            stage: progress.stage,
+          });
+          if (progress.percentage === 100) {
+            setUploading(false);
+            setFile(null);
+            toast.success(`${file.name} uploaded successfully`);
+            setProgress({
+              percent: 0,
+              stage: "",
+            });
+            // Invalidate and refetch the files query to update the file grid
+            queryClient.invalidateQueries({ queryKey: ["list-files"] });
+            setOpen(false);
+          }
+        }
+      );
+    } catch (error: any) {
+      console.error("Upload failed:", error);
+      toast.error(`Upload failed: ${error.message}`);
+      setUploading(false);
     }
   };
 
@@ -140,16 +195,18 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
                     Encrypted
                   </span>
                 </div>
-                <Progress value={20} className="h-1" />
+                <Progress value={progress.percent} className="h-1" />
+                <p className="text-xs text-muted-foreground mt-2">
+                  {progress.stage}
+                </p>
               </div>
             </div>
           </div>
         )}
 
         <div className="flex justify-end gap-2">
-          <Button onClick={handleUpload}>Upload</Button>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Close
+          <Button onClick={handleUpload} disabled={uploading}>
+            {uploading ? "Uploading..." : "Upload"}
           </Button>
         </div>
       </DialogContent>

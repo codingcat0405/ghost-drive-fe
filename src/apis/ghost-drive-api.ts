@@ -24,6 +24,38 @@ const ghostDriveApi = {
     }
   },
   file: {
+    createFileEntry: async (data: {
+      name: string,
+      objectKey: string,
+      path: string,
+      size: number,
+      mimeType: string
+    }) => {
+      return await axiosClient.post("/files", data);
+    },
+    getFiles: async (params: {
+      path?: string;
+      page?: number;
+      limit?: number;
+    }): Promise<{
+      contents: {
+        id: number;
+        createdAt: string;
+        updatedAt: string;
+        name: string;
+        objectKey: string;
+        path: string;
+        size: number;
+        mimeType: string;
+        userId: number;
+      }[],
+      currentPage: number;
+      perPage: number;
+      totalPage: number;
+      totalElements: number;
+    }> => {
+      return await axiosClient.get("/files", { params });
+    },
     getUploadUrl: (objectKey: string): Promise<{ uploadUrl: string }> => {
       return axiosClient.post(`/files/upload-url`, { objectKey });
     },

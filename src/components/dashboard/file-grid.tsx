@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,38 +31,141 @@ import {
   BreadcrumbList,
   BreadcrumbSeparator,
 } from "../ui/breadcrumb";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
+import { useQuery } from "@tanstack/react-query";
+import ghostDriveApi from "@/apis/ghost-drive-api";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "../ui/pagination";
 
 type ViewMode = "grid" | "list";
 
 interface FileItem {
   id: string;
   name: string;
-  type: "folder" | "document" | "image" | "video" | "audio";
+  type: string;
   size?: string;
   modified: string;
   encrypted: boolean;
 }
 
-const mockFiles: FileItem[] = [];
-
-function getFileIcon(type: FileItem["type"]) {
-  switch (type) {
-    case "folder":
-      return <Folder className="h-8 w-8 text-primary" />;
-    case "document":
-      return <FileText className="h-8 w-8 text-blue-500" />;
-    case "image":
-      return <ImageIcon className="h-8 w-8 text-green-500" />;
-    case "video":
-      return <Video className="h-8 w-8 text-purple-500" />;
-    case "audio":
-      return <Music className="h-8 w-8 text-orange-500" />;
+function getFileIcon(mimeType: string) {
+  if (mimeType.startsWith("image/")) {
+    return <ImageIcon className="h-8 w-8 text-green-500" />;
   }
+  if (mimeType.startsWith("video/")) {
+    return <Video className="h-8 w-8 text-purple-500" />;
+  }
+  if (mimeType.startsWith("audio/")) {
+    return <Music className="h-8 w-8 text-orange-500" />;
+  }
+  if (
+    mimeType.startsWith("text/") ||
+    mimeType.includes("document") ||
+    mimeType.includes("pdf") ||
+    mimeType.includes("word") ||
+    mimeType.includes("sheet") ||
+    mimeType.includes("presentation")
+  ) {
+    return <FileText className="h-8 w-8 text-blue-500" />;
+  }
+  if(mimeType === "folder") {
+    return <Folder className="h-8 w-8 text-primary" />;
+  }
+  // For folders, you'll need to handle separately since folders don't have MIME types
+  // Default fallback
+  return <FileText className="h-8 w-8 text-gray-500" />;
 }
 
 export function FileGrid() {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Get page from URL or default to 1
+  const currentPage = parseInt(searchParams.get("page") || "1", 10);
+
+  const [fileParams, setFileParams] = useState({
+    path: "/",
+    page: currentPage,
+    limit: 10,
+  });
+
+  // Update fileParams when URL page changes
+  useEffect(() => {
+    setFileParams((prev) => ({ ...prev, page: currentPage }));
+  }, [currentPage]);
+
+  const { data: fileData, isLoading } = useQuery({
+    queryKey: ["list-files", fileParams],
+    queryFn: ({ queryKey }) => ghostDriveApi.file.getFiles(queryKey[1] as any),
+  });
+  const files: FileItem[] = useMemo(() => {
+    const allFiles = fileData?.contents || [];
+    return allFiles.map((file) => ({
+      id: file.id.toString(),
+      name: file.name,
+      type: file.mimeType,
+      size: (file.size / 1024 / 1024).toFixed(2) + " MB",
+      modified: file.createdAt,
+      encrypted: true,
+    }));
+  }, [fileData]);
+
+  // Pagination data from API response
+  const paginationData = fileData
+    ? {
+        currentPage: fileData.currentPage,
+        totalPages: fileData.totalPage,
+        totalElements: fileData.totalElements,
+        perPage: fileData.perPage,
+      }
+    : null;
+
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    // Update URL with new page parameter
+    setSearchParams((prev) => {
+      const newParams = new URLSearchParams(prev);
+      newParams.set("page", newPage.toString());
+      return newParams;
+    });
+  };
+
+  // Generate page numbers for pagination
+  const generatePageNumbers = () => {
+    if (!paginationData) return [];
+
+    const { currentPage, totalPages } = paginationData;
+    const pages = [];
+
+    // Always show first page
+    if (currentPage > 3) {
+      pages.push(1);
+      if (currentPage > 4) pages.push("ellipsis");
+    }
+
+    // Show pages around current page
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, currentPage + 2);
+
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+
+    // Always show last page
+    if (currentPage < totalPages - 2) {
+      if (currentPage < totalPages - 3) pages.push("ellipsis");
+      pages.push(totalPages);
+    }
+
+    return pages;
+  };
 
   return (
     <div className="space-y-4">
@@ -70,7 +173,14 @@ export function FileGrid() {
         <div>
           <h2 className="text-2xl font-bold">My Files</h2>
           <p className="text-sm text-muted-foreground">
-            All your encrypted files in one place
+            {paginationData
+              ? `Showing ${
+                  (paginationData.currentPage - 1) * paginationData.perPage + 1
+                }-${Math.min(
+                  paginationData.currentPage * paginationData.perPage,
+                  paginationData.totalElements
+                )} of ${paginationData.totalElements} files`
+              : "All your encrypted files in one place"}
           </p>
         </div>
 
@@ -103,9 +213,26 @@ export function FileGrid() {
           </BreadcrumbSeparator>
         </BreadcrumbList>
       </Breadcrumb>
-      {viewMode === "grid" ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading files...</p>
+          </div>
+        </div>
+      ) : files.length === 0 ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <Folder className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No files yet</h3>
+            <p className="text-muted-foreground">
+              Upload your first file to get started
+            </p>
+          </div>
+        </div>
+      ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {mockFiles.map((file) => (
+          {files?.map((file) => (
             <Card
               key={file.id}
               className="p-4 hover:bg-accent/50 transition-colors cursor-pointer border-border/50 bg-card/50 group"
@@ -181,7 +308,7 @@ export function FileGrid() {
       ) : (
         <Card className="border-border/50 bg-card/50">
           <div className="divide-y divide-border/50">
-            {mockFiles.map((file) => (
+            {files.map((file) => (
               <div
                 key={file.id}
                 className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors cursor-pointer group"
@@ -251,6 +378,49 @@ export function FileGrid() {
             ))}
           </div>
         </Card>
+      )}
+      {paginationData && paginationData.totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => handlePageChange(paginationData.currentPage - 1)}
+                className={
+                  paginationData.currentPage <= 1
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
+              />
+            </PaginationItem>
+
+            {generatePageNumbers().map((page, index) => (
+              <PaginationItem key={index}>
+                {page === "ellipsis" ? (
+                  <PaginationEllipsis />
+                ) : (
+                  <PaginationLink
+                    onClick={() => handlePageChange(page as number)}
+                    isActive={page === paginationData.currentPage}
+                    className="cursor-pointer"
+                  >
+                    {page}
+                  </PaginationLink>
+                )}
+              </PaginationItem>
+            ))}
+
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => handlePageChange(paginationData.currentPage + 1)}
+                className={
+                  paginationData.currentPage >= paginationData.totalPages
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       )}
     </div>
   );
