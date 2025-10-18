@@ -1,5 +1,3 @@
-import type React from "react";
-
 import { useState } from "react";
 import {
   Dialog,
@@ -8,62 +6,91 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Folder, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface FolderItem {
-  id: string;
-  name: string;
-  path: string;
-}
-
-const mockFolders: FolderItem[] = [
-  { id: "1", name: "Work Documents", path: "/Work Documents" },
-  { id: "2", name: "Personal Photos", path: "/Personal Photos" },
-  { id: "3", name: "Design Assets", path: "/Design Assets" },
-  { id: "4", name: "Projects", path: "/Projects" },
-  { id: "5", name: "Archive", path: "/Archive" },
-];
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import ghostDriveApi from "@/apis/ghost-drive-api";
+import { useSearchParams } from "react-router";
+import { toast } from "sonner";
+import { shortenFileName } from "@/utils/common";
 
 export function MoveFileDialog({
-  children,
-  fileName,
+  file,
+  open,
+  setOpen,
 }: {
-  children: React.ReactNode;
-  fileName: string;
+  file: {
+    id: number;
+    name: string;
+    type: "file" | "folder";
+  };
+  open: boolean;
+  setOpen: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [selectedFolder, setSelectedFolder] = useState<number | null>(null);
   const [isMoving, setIsMoving] = useState(false);
+  const [searchParams] = useSearchParams();
+  const currentFolderId = searchParams.get("folder")
+    ? parseInt(searchParams.get("folder")!)
+    : undefined;
+  const { data: moveDestinations = [] } = useQuery({
+    queryKey: [
+      "move-destinations",
+      { sourceFolderId: currentFolderId, type: file.type },
+    ],
+    queryFn: ({ queryKey }) =>
+      ghostDriveApi.folder.getMoveDestinations(queryKey[1] as any),
+  });
 
+  const queryClient = useQueryClient();
   const handleMove = async () => {
     if (!selectedFolder) return;
-
-    setIsMoving(true);
-
-    // TODO: Implement actual file move with your Elysia backend
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    setIsMoving(false);
-    setOpen(false);
+    try {
+      setIsMoving(true);
+      if (file.type === "folder") {
+        await ghostDriveApi.folder.updateFolder(file.id, {
+          parentId: selectedFolder,
+          name: file.name,
+        });
+      } else {
+        await ghostDriveApi.file.updateFileEntry(file.id, {
+          folderId: selectedFolder,
+          name: file.name,
+        });
+      }
+      queryClient.invalidateQueries({
+        queryKey: ["folder-contents", { folderId: currentFolderId }],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [
+          "move-destinations",
+          { sourceFolderId: currentFolderId, type: file.type },
+        ],
+      });
+      toast.success("File moved successfully");
+      setOpen(false);
+    } catch (error: any) {
+      console.error("Failed to move file:", error);
+      toast.error(error.message);
+    } finally {
+      setIsMoving(false);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Move "{fileName}"</DialogTitle>
+          <DialogTitle>Move "{shortenFileName(file.name)}"</DialogTitle>
           <DialogDescription>Select a destination folder</DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="h-64 rounded-lg border border-border">
           <div className="p-2 space-y-1">
-            {mockFolders.map((folder) => (
+            {moveDestinations.map((folder) => (
               <button
                 key={folder.id}
                 onClick={() => setSelectedFolder(folder.id)}
@@ -82,7 +109,7 @@ export function MoveFileDialog({
                       : "text-muted-foreground"
                   )}
                 />
-                <span className="flex-1 font-medium">{folder.name}</span>
+                <span className="flex-1 font-medium">{folder.path}</span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </button>
             ))}

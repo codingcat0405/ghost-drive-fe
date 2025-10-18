@@ -17,7 +17,7 @@ import {
   MoreVertical,
   Download,
   Trash2,
-  Share2,
+  Move,
   Edit,
   Grid3x3,
   List,
@@ -45,6 +45,7 @@ import {
   PaginationPrevious,
 } from "../ui/pagination";
 import moment from "moment";
+import { MoveFileDialog } from "../file-management/move-file-dialog";
 
 type ViewMode = "grid" | "list";
 
@@ -89,7 +90,12 @@ function getFileIcon(mimeType: string) {
 export function FileGrid() {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [searchParams, setSearchParams] = useSearchParams();
-
+  const [moveFileDialogOpen, setMoveFileDialogOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<{
+    id: number;
+    name: string;
+    type: 'file' | 'folder';
+  } | null>(null);
   // Get page and folder from URL or default values
   const currentPage = parseInt(searchParams.get("page") || "1", 10);
   const currentFolderId = searchParams.get("folder") || undefined;
@@ -311,25 +317,42 @@ export function FileGrid() {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem>
+                  <DropdownMenuContent
+                    align="end"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
                       <Download className="mr-2 h-4 w-4" />
                       Download
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Share2 className="mr-2 h-4 w-4" />
-                      Share
+
+                    <DropdownMenuItem onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedFile({
+                        id: +file.id,
+                        name: file.name,
+                        type: file.type === 'folder' ? 'folder' : 'file',
+                      });
+                      setMoveFileDialogOpen(true);
+                    }}>
+                      <Move className="mr-2 h-4 w-4" />
+                      Move to
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
+
+                    <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
                       <Edit className="mr-2 h-4 w-4" />
                       Rename
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive">
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Delete
                     </DropdownMenuItem>
@@ -419,25 +442,42 @@ export function FileGrid() {
                       variant="ghost"
                       size="icon"
                       className="opacity-0 group-hover:opacity-100"
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem>
+                  <DropdownMenuContent
+                    align="end"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
                       <Download className="mr-2 h-4 w-4" />
                       Download
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Share2 className="mr-2 h-4 w-4" />
-                      Share
+
+                    <DropdownMenuItem onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedFile({
+                        id: +file.id,
+                        name: file.name,
+                        type: file.type === 'folder' ? 'folder' : 'file',
+                      });
+                      setMoveFileDialogOpen(true);
+                    }}>
+                      <Move className="mr-2 h-4 w-4" />
+                      Move to
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
+
+                    <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
                       <Edit className="mr-2 h-4 w-4" />
                       Rename
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive">
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Delete
                     </DropdownMenuItem>
@@ -491,6 +531,11 @@ export function FileGrid() {
           </PaginationContent>
         </Pagination>
       )}
+      <MoveFileDialog
+        file={selectedFile ?? { id: 0, name: '', type: 'file' }}
+        open={moveFileDialogOpen}
+        setOpen={setMoveFileDialogOpen}
+      />
     </div>
   );
 }

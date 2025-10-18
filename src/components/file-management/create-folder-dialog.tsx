@@ -47,6 +47,7 @@ export function CreateFolderDialog({
       setFolderName("");
       setOpen(false);
       queryClient.invalidateQueries({ queryKey: ["folder-contents"] });
+      queryClient.invalidateQueries({ queryKey: ["move-destinations"] });
       toast.success("Folder created successfully");
     } catch (error: any) {
       console.error("Failed to create folder:", error);

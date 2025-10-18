@@ -69,6 +69,12 @@ const ghostDriveApi = {
     }> => {
       return await axiosClient.get("/files", { params });
     },
+    updateFileEntry: async (id: number, data: {
+      name?: string;
+      folderId?: number;
+    }): Promise<void> => {
+      return await axiosClient.put(`/files/${id}`, data);
+    },
 
   },
   upload: {
@@ -103,6 +109,7 @@ const ghostDriveApi = {
         createdAt: string;
         updatedAt: string;
         userId: number;
+        path: string;
       }[],
       currentPage: number;
       perPage: number;
@@ -121,7 +128,8 @@ const ghostDriveApi = {
       return await axiosClient.delete(`/folders/${id}`);
     },
     updateFolder: async (id: number, data: {
-      name: string;
+      name?: string;
+      parentId?: number;
     }): Promise<void> => {
       return await axiosClient.put(`/folders/${id}`, data);
     },
@@ -150,7 +158,35 @@ const ghostDriveApi = {
         updatedAt: string;
       }[]
     > => {
-      return await axiosClient.get(`/folders/tree`, { params });
+      return await axiosClient.get(`/folders/parent-tree`, { params });
+    },
+    getChildren: async (params: {
+      folderId?: number;
+    }): Promise<
+      {
+        id: number;
+        name: string;
+        parentId: number;
+        userId: number;
+        createdAt: string;
+        updatedAt: string;
+      }[]
+    > => {
+      return await axiosClient.get(`/folders/children`, { params });
+    },
+    getMoveDestinations: async (params: {
+      sourceFolderId?: number;
+      type: 'file' | 'folder';
+    }): Promise<{
+      name: string;
+      id: number;
+      path: string;
+      parentId: number;
+      createdAt: string;
+      updatedAt: string;
+      userId: number;
+    }[]> => {
+      return await axiosClient.get(`/folders/move-destinations`, { params });
     },
   }
 };
