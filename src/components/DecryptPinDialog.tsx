@@ -1,5 +1,6 @@
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -15,16 +16,18 @@ import { toast } from "sonner";
 import usePinDialogStore from "@/store/pinDialog";
 import useUserStore from "@/store/user";
 import cryptoUtils from "@/utils/crypto";
+import { Shield, XCircle, Lock } from "lucide-react";
 
 const DecryptPinDialog: React.FC = () => {
   const { open, setOpen } = usePinDialogStore();
   const { user, setUser } = useUserStore();
   const [pin, setPin] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
+  const [error, setError] = useState("");
   const handleDecryptAesKey = async () => {
     if (pin.length !== 6) {
       toast.error("Please enter a 6-digit PIN");
+      setError("Please enter a 6-digit PIN");
       return;
     }
 
@@ -45,6 +48,7 @@ const DecryptPinDialog: React.FC = () => {
       toast.success("PIN verified successfully");
     } catch (error: any) {
       console.error(error);
+      setError("Invalid PIN. Please try again.");
       toast.error("Invalid PIN. Please try again.");
     } finally {
       setIsLoading(false);
@@ -52,43 +56,99 @@ const DecryptPinDialog: React.FC = () => {
     }
   };
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => {
-      if (!isOpen) {
-        setPin("");
-      }
-      setOpen(isOpen);
-    }}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Enter your PIN</DialogTitle>
-          <DialogDescription>
-            Enter your PIN to encrypt/decrypt your files.
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="sm:max-w-[480px] border-border/50">
+        <DialogHeader className="space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
+              <Shield className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1">
+              <DialogTitle className="text-xl">Enter Your PIN</DialogTitle>
+            </div>
+          </div>
+          <DialogDescription className="text-base leading-relaxed">
+            Enter your PIN to encrypt or decrypt your files
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex justify-between items-center gap-2">
-          <Label>PIN</Label>
-          <InputOTP
-            type="password"
-            maxLength={6}
-            pattern={REGEXP_ONLY_DIGITS}
-            value={pin}
-            onChange={setPin}
-          >
-            <InputOTPGroup>
-              <InputOTPSlot index={0} type="password" />
-              <InputOTPSlot index={1} type="password" />
-              <InputOTPSlot index={2} type="password" />
-              <InputOTPSlot index={3} type="password" />
-              <InputOTPSlot index={4} type="password" />
-              <InputOTPSlot index={5} type="password" />
-            </InputOTPGroup>
-          </InputOTP>
+        <div className="space-y-6 py-4">
+          {/* PIN Input */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Lock className="h-4 w-4 text-muted-foreground" />
+              <Label className="text-sm font-medium">Enter PIN</Label>
+            </div>
+            <div className="flex justify-center">
+              <InputOTP
+                maxLength={6}
+                pattern={REGEXP_ONLY_DIGITS}
+                value={pin}
+                onChange={(value) => {
+                  setPin(value);
+                  setError("");
+                }}
+              >
+                <InputOTPGroup className="gap-2">
+                  <InputOTPSlot
+                    type="password"
+                    index={0}
+                    className="h-14 w-12 text-lg border-border/50"
+                  />
+                  <InputOTPSlot
+                    type="password"
+                    index={1}
+                    className="h-14 w-12 text-lg border-border/50"
+                  />
+                  <InputOTPSlot
+                    type="password"
+                    index={2}
+                    className="h-14 w-12 text-lg border-border/50"
+                  />
+                  <InputOTPSlot
+                    type="password"
+                    index={3}
+                    className="h-14 w-12 text-lg border-border/50"
+                  />
+                  <InputOTPSlot
+                    type="password"
+                    index={4}
+                    className="h-14 w-12 text-lg border-border/50"
+                  />
+                  <InputOTPSlot
+                    type="password"
+                    index={5}
+                    className="h-14 w-12 text-lg border-border/50"
+                  />
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
+              <XCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+          )}
         </div>
 
-        <DialogFooter>
-          <Button onClick={handleDecryptAesKey} disabled={isLoading}>
-            {isLoading ? "Decrypting..." : "Confirm"}
+        <DialogFooter className="gap-2 sm:gap-0">
+          <DialogClose asChild>
+            <Button
+              variant="outline"
+              className="border-border/50 bg-transparent"
+            >
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button
+            onClick={handleDecryptAesKey}
+            disabled={isLoading}
+            className="bg-primary hover:bg-primary/90"
+          >
+            <Lock className="h-4 w-4 mr-2" /> Unlock
           </Button>
         </DialogFooter>
       </DialogContent>

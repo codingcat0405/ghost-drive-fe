@@ -46,6 +46,9 @@ import {
 } from "../ui/pagination";
 import moment from "moment";
 import { MoveFileDialog } from "../file-management/move-file-dialog";
+import { ConfirmDeleteDialog } from "../file-management/delete-file-dialog";
+import { RenameFileDialog } from "../file-management/rename-file-dialog";
+import { DownloadFileDialog } from "../file-management/download-file-dialog";
 
 type ViewMode = "grid" | "list";
 
@@ -91,10 +94,15 @@ export function FileGrid() {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [searchParams, setSearchParams] = useSearchParams();
   const [moveFileDialogOpen, setMoveFileDialogOpen] = useState(false);
+  const [downloadFileDialogOpen, setDownloadFileDialogOpen] = useState(false);
+  const [renameFileDialogOpen, setRenameFileDialogOpen] = useState(false);
+  const [deleteFileDialogOpen, setDeleteFileDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<{
     id: number;
     name: string;
-    type: 'file' | 'folder';
+    type: "file" | "folder";
+    size: number;
+    mimeType: string;
   } | null>(null);
   // Get page and folder from URL or default values
   const currentPage = parseInt(searchParams.get("page") || "1", 10);
@@ -326,32 +334,82 @@ export function FileGrid() {
                     align="end"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFile({
+                          id: +file.id,
+                          name: file.name,
+                          type: file.type === "folder" ? "folder" : "file",
+                          size: file.size ? +file.size : 0,
+                          mimeType:
+                            file.type === "folder"
+                              ? "application/octet-stream"
+                              : file.type,
+                        });
+                        setDownloadFileDialogOpen(true);
+                      }}
+                    >
                       <Download className="mr-2 h-4 w-4" />
                       Download
                     </DropdownMenuItem>
 
-                    <DropdownMenuItem onClick={(e) => {
-                      e.stopPropagation()
-                      setSelectedFile({
-                        id: +file.id,
-                        name: file.name,
-                        type: file.type === 'folder' ? 'folder' : 'file',
-                      });
-                      setMoveFileDialogOpen(true);
-                    }}>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFile({
+                          id: +file.id,
+                          name: file.name,
+                          type: file.type === "folder" ? "folder" : "file",
+                          size: file.size ? +file.size : 0,
+                          mimeType:
+                            file.type === "folder"
+                              ? "application/octet-stream"
+                              : file.type,
+                        });
+                        setMoveFileDialogOpen(true);
+                      }}
+                    >
                       <Move className="mr-2 h-4 w-4" />
                       Move to
                     </DropdownMenuItem>
 
-                    <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFile({
+                          id: +file.id,
+                          name: file.name,
+                          type: file.type === "folder" ? "folder" : "file",
+                          size: file.size ? +file.size : 0,
+                          mimeType:
+                            file.type === "folder"
+                              ? "application/octet-stream"
+                              : file.type,
+                        });
+                        setRenameFileDialogOpen(true);
+                      }}
+                    >
                       <Edit className="mr-2 h-4 w-4" />
                       Rename
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive"
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFile({
+                          id: +file.id,
+                          name: file.name,
+                          type: file.type === "folder" ? "folder" : "file",
+                          size: file.size ? +file.size : 0,
+                          mimeType:
+                            file.type === "folder"
+                              ? "application/octet-stream"
+                              : file.type,
+                        });
+                        setDeleteFileDialogOpen(true);
+                      }}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Delete
@@ -451,32 +509,82 @@ export function FileGrid() {
                     align="end"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFile({
+                          id: +file.id,
+                          name: file.name,
+                          type: file.type === "folder" ? "folder" : "file",
+                          size: file.size ? +file.size : 0,
+                          mimeType:
+                            file.type === "folder"
+                              ? "application/octet-stream"
+                              : file.type,
+                        });
+                        setDownloadFileDialogOpen(true);
+                      }}
+                    >
                       <Download className="mr-2 h-4 w-4" />
                       Download
                     </DropdownMenuItem>
 
-                    <DropdownMenuItem onClick={(e) => {
-                      e.stopPropagation()
-                      setSelectedFile({
-                        id: +file.id,
-                        name: file.name,
-                        type: file.type === 'folder' ? 'folder' : 'file',
-                      });
-                      setMoveFileDialogOpen(true);
-                    }}>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFile({
+                          id: +file.id,
+                          name: file.name,
+                          type: file.type === "folder" ? "folder" : "file",
+                          size: file.size ? +file.size : 0,
+                          mimeType:
+                            file.type === "folder"
+                              ? "application/octet-stream"
+                              : file.type,
+                        });
+                        setMoveFileDialogOpen(true);
+                      }}
+                    >
                       <Move className="mr-2 h-4 w-4" />
                       Move to
                     </DropdownMenuItem>
 
-                    <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFile({
+                          id: +file.id,
+                          name: file.name,
+                          type: file.type === "folder" ? "folder" : "file",
+                          size: file.size ? +file.size : 0,
+                          mimeType:
+                            file.type === "folder"
+                              ? "application/octet-stream"
+                              : file.type,
+                        });
+                        setRenameFileDialogOpen(true);
+                      }}
+                    >
                       <Edit className="mr-2 h-4 w-4" />
                       Rename
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive"
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFile({
+                          id: +file.id,
+                          name: file.name,
+                          type: file.type === "folder" ? "folder" : "file",
+                          size: file.size ? +file.size : 0,
+                          mimeType:
+                            file.type === "folder"
+                              ? "application/octet-stream"
+                              : file.type,
+                        });
+                        setDeleteFileDialogOpen(true);
+                      }}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Delete
@@ -532,9 +640,56 @@ export function FileGrid() {
         </Pagination>
       )}
       <MoveFileDialog
-        file={selectedFile ?? { id: 0, name: '', type: 'file' }}
+        file={
+          selectedFile ?? {
+            id: 0,
+            name: "",
+            type: "file",
+            size: 0,
+            mimeType: "",
+          }
+        }
         open={moveFileDialogOpen}
         setOpen={setMoveFileDialogOpen}
+      />
+      <ConfirmDeleteDialog
+        file={
+          selectedFile ?? {
+            id: 0,
+            name: "",
+            type: "file",
+            size: 0,
+            mimeType: "",
+          }
+        }
+        open={deleteFileDialogOpen}
+        setOpen={setDeleteFileDialogOpen}
+      />
+      <RenameFileDialog
+        file={
+          selectedFile ?? {
+            id: 0,
+            name: "",
+            type: "file",
+            size: 0,
+            mimeType: "",
+          }
+        }
+        open={renameFileDialogOpen}
+        setOpen={setRenameFileDialogOpen}
+      />
+      <DownloadFileDialog
+        file={
+          selectedFile ?? {
+            id: 0,
+            name: "",
+            type: "file",
+            size: 0,
+            mimeType: "",
+          }
+        }
+        open={downloadFileDialogOpen}
+        setOpen={setDownloadFileDialogOpen}
       />
     </div>
   );
