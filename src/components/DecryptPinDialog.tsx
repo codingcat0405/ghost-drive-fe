@@ -13,13 +13,15 @@ import { REGEXP_ONLY_DIGITS } from "input-otp";
 import { Button } from "./ui/button";
 import { useState } from "react";
 import { toast } from "sonner";
-import usePinDialogStore from "@/store/pinDialog";
 import useUserStore from "@/store/user";
 import cryptoUtils from "@/utils/crypto";
 import { Shield, XCircle, Lock } from "lucide-react";
 
-const DecryptPinDialog: React.FC = () => {
-  const { open, setOpen } = usePinDialogStore();
+const DecryptPinDialog: React.FC<{
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  onSuccess: () => void;
+}> = ({ open, setOpen, onSuccess }) => {
   const { user, setUser } = useUserStore();
   const [pin, setPin] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -46,6 +48,7 @@ const DecryptPinDialog: React.FC = () => {
       setOpen(false);
       setPin("");
       toast.success("PIN verified successfully");
+      onSuccess();
     } catch (error: any) {
       console.error(error);
       setError("Invalid PIN. Please try again.");

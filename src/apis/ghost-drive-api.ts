@@ -75,6 +75,9 @@ const ghostDriveApi = {
     }): Promise<void> => {
       return await axiosClient.put(`/files/${id}`, data);
     },
+    deleteFileEntry: async (id: number) => {
+      return await axiosClient.delete(`/files/${id}`)
+    }
 
   },
   upload: {

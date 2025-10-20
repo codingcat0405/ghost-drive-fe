@@ -1,4 +1,4 @@
-import { AlertTriangle, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -8,6 +8,10 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { Button } from "../ui/button";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import ghostDriveApi from "@/apis/ghost-drive-api";
 
 export function ConfirmDeleteDialog({
   open,
@@ -22,8 +26,27 @@ export function ConfirmDeleteDialog({
     type: "file" | "folder";
   };
 }) {
-  const handleConfirm = () => {
-    setOpen(false);
+  const queryClient = useQueryClient();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const handleConfirm = async () => {
+    try {
+      if (!file) return;
+      setIsDeleting(true);
+      if (file.type === "file") {
+        await ghostDriveApi.file.deleteFileEntry(file.id);
+      } else {
+        await ghostDriveApi.folder.deleteFolder(file.id);
+      }
+      queryClient.invalidateQueries({ queryKey: ["folder-contents"] });
+      queryClient.invalidateQueries({ queryKey: ["move-destinations"] });
+      toast.success("File deleted successfully");
+      setOpen(false);
+    } catch (error: any) {
+      console.error("Failed to delete file:", error);
+      toast.error(error.message);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -38,8 +61,10 @@ export function ConfirmDeleteDialog({
           </div>
           <DialogDescription className="text-base">
             Are you sure you want to delete{" "}
-            <span className="font-semibold text-foreground">"{file?.name}"</span>?
-            This action cannot be undone.
+            <span className="font-semibold text-foreground">
+              "{file?.name}"
+            </span>
+            ? This action cannot be undone.
           </DialogDescription>
         </DialogHeader>
 
@@ -51,9 +76,17 @@ export function ConfirmDeleteDialog({
           >
             Cancel
           </Button>
-          <Button onClick={handleConfirm} variant="destructive">
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
+          <Button
+            onClick={handleConfirm}
+            disabled={isDeleting}
+            variant="destructive"
+          >
+            {isDeleting ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4 mr-2" />
+            )}
+            {isDeleting ? "Deleting..." : "Delete"}
           </Button>
         </DialogFooter>
       </DialogContent>

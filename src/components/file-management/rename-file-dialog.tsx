@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -6,12 +6,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { PencilIcon } from "lucide-react"
-
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PencilIcon } from "lucide-react";
+import { getFileExtension, shortenFileName } from "@/utils/common";
+import { toast } from "sonner";
+import ghostDriveApi from "@/apis/ghost-drive-api";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function RenameFileDialog({
   open,
@@ -26,22 +29,37 @@ export function RenameFileDialog({
     type: "file" | "folder";
   };
 }) {
-  const [newName, setNewName] = useState(file?.name)
-  const [isRenaming, setIsRenaming] = useState(false)
-
-  
-
+  const [newName, setNewName] = useState(file?.name);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const queryClient = useQueryClient();
   const handleRename = async () => {
-    if (!newName.trim() || newName === file?.name) return
+    if (!file) return;
+    if (!newName.trim() || newName === file?.name) return;
 
-    setIsRenaming(true)
+    try {
+      setIsRenaming(true);
 
-    // TODO: Implement actual file rename with your Elysia backend
-    await new Promise((resolve) => setTimeout(resolve, 500))
-
-    setIsRenaming(false)
-    setOpen(false)
-  }
+      if (file.type === "file") {
+        await ghostDriveApi.file.updateFileEntry(file.id, {
+          name: newName + "." + getFileExtension(file.name),
+        });
+      } else {
+        await ghostDriveApi.folder.updateFolder(file.id, {
+          name: newName,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["folder-contents"] });
+      queryClient.invalidateQueries({ queryKey: ["move-destinations"] });
+      toast.success("File renamed successfully");
+      setNewName("");
+      setOpen(false);
+    } catch (error: any) {
+      console.error("Failed to rename file:", error);
+      toast.error(error.message);
+    } finally {
+      setIsRenaming(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -51,12 +69,16 @@ export function RenameFileDialog({
             <PencilIcon className="h-5 w-5 text-primary" />
             Rename File
           </DialogTitle>
-          <DialogDescription>Enter a new name for "{file?.name}"</DialogDescription>
+          <DialogDescription>
+            Enter a new name for "{shortenFileName(file?.name)}"
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="new-name">New File Name</Label>
+            <Label htmlFor="new-name">
+              New {file.type === "file" ? "File" : "Folder"} Name
+            </Label>
             <Input
               id="new-name"
               value={newName}
@@ -64,12 +86,21 @@ export function RenameFileDialog({
               placeholder="Enter new file name"
               autoFocus
               onKeyDown={(e) => {
-                if (e.key === "Enter" && newName.trim() && newName !== file?.name) {
-                  handleRename()
+                if (
+                  e.key === "Enter" &&
+                  newName.trim() &&
+                  newName !== file?.name
+                ) {
+                  handleRename();
                 }
               }}
             />
-            <p className="text-xs text-muted-foreground">Extension: .jpg</p>
+            <p className="text-xs text-muted-foreground">
+              Extension:{" "}
+              {file.type === "file"
+                ? `.${getFileExtension(file?.name)}`
+                : "folder"}
+            </p>
           </div>
         </div>
 
@@ -87,5 +118,5 @@ export function RenameFileDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

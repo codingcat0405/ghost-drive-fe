@@ -48,7 +48,9 @@ import moment from "moment";
 import { MoveFileDialog } from "../file-management/move-file-dialog";
 import { ConfirmDeleteDialog } from "../file-management/delete-file-dialog";
 import { RenameFileDialog } from "../file-management/rename-file-dialog";
-import { DownloadFileDialog } from "../file-management/download-file-dialog";
+import { PreviewFileDialog } from "../file-management/preview-file-dialog";
+import useUserStore from "@/store/user";
+import DecryptPinDialog from "../DecryptPinDialog";
 
 type ViewMode = "grid" | "list";
 
@@ -57,9 +59,11 @@ interface FileItem {
   id: string;
   name: string;
   type: string;
-  size?: string;
+  size?: number;
+  sizeFormatted?: string;
   modified: string;
   encrypted: boolean;
+  objectKey: string;
 }
 
 function getFileIcon(mimeType: string) {
@@ -94,16 +98,20 @@ export function FileGrid() {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [searchParams, setSearchParams] = useSearchParams();
   const [moveFileDialogOpen, setMoveFileDialogOpen] = useState(false);
-  const [downloadFileDialogOpen, setDownloadFileDialogOpen] = useState(false);
   const [renameFileDialogOpen, setRenameFileDialogOpen] = useState(false);
   const [deleteFileDialogOpen, setDeleteFileDialogOpen] = useState(false);
+  const [previewFileDialogOpen, setPreviewFileDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<{
     id: number;
     name: string;
     type: "file" | "folder";
     size: number;
     mimeType: string;
+    objectKey: string;
   } | null>(null);
+  const { user } = useUserStore();
+  const [openPinDialog, setOpenPinDialog] = useState(false);
+
   // Get page and folder from URL or default values
   const currentPage = parseInt(searchParams.get("page") || "1", 10);
   const currentFolderId = searchParams.get("folder") || undefined;
@@ -136,7 +144,6 @@ export function FileGrid() {
         folderId: (queryKey[1] as any).folderId,
       }),
   });
-  console.log("parentTreeData", parentTreeData);
 
   const folderContents: FileItem[] = useMemo(() => {
     const allContents = folderContentsData?.contents || [];
@@ -148,9 +155,13 @@ export function FileGrid() {
       type: item.folderId
         ? item.mimeType ?? "application/octet-stream"
         : "folder",
-      size: item.size ? (item.size / 1024 / 1024).toFixed(2) + " MB" : "",
+      sizeFormatted: item.size
+        ? (item.size / 1024 / 1024).toFixed(2) + " MB"
+        : "",
+      size: item.size,
       modified: moment(item.createdAt).format("DD/MM/YYYY HH:mm:ss"),
       encrypted: true,
+      objectKey: item.objectKey ?? "",
     }));
   }, [folderContentsData]);
 
@@ -212,6 +223,26 @@ export function FileGrid() {
     }
 
     return pages;
+  };
+  const handleFileClick = (file: FileItem) => {
+    if (file.type === "folder") {
+      handleFolderClick(file.id);
+      return;
+    }
+    setSelectedFile({
+      id: +file.id,
+      name: file.name,
+      type: file.type === "folder" ? "folder" : "file",
+      size: file.size ?? 0,
+      mimeType: file.type === "folder" ? "application/octet-stream" : file.type,
+      objectKey: file.objectKey ?? "",
+    });
+    if (!user.aesKeyPlain) {
+      // If user doesn't have aesKeyPlain, show PIN dialog instead
+      setOpenPinDialog(true);
+      return;
+    }
+    setPreviewFileDialogOpen(true);
   };
 
   return (
@@ -311,9 +342,7 @@ export function FileGrid() {
             <Card
               key={file.key}
               className="p-4 hover:bg-accent/50 transition-colors cursor-pointer border-border/50 bg-card/50 group"
-              onClick={() =>
-                file.type === "folder" ? handleFolderClick(file.id) : undefined
-              }
+              onClick={() => handleFileClick(file)}
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="p-3 rounded-lg bg-muted/50">
@@ -334,25 +363,33 @@ export function FileGrid() {
                     align="end"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedFile({
-                          id: +file.id,
-                          name: file.name,
-                          type: file.type === "folder" ? "folder" : "file",
-                          size: file.size ? +file.size : 0,
-                          mimeType:
-                            file.type === "folder"
-                              ? "application/octet-stream"
-                              : file.type,
-                        });
-                        setDownloadFileDialogOpen(true);
-                      }}
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      Download
-                    </DropdownMenuItem>
+                    {file.type !== "folder" && (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFile({
+                            id: +file.id,
+                            name: file.name,
+                            type: file.type === "folder" ? "folder" : "file",
+                            size: file.size ?? 0,
+                            mimeType:
+                              file.type === "folder"
+                                ? "application/octet-stream"
+                                : file.type,
+                            objectKey: file.objectKey ?? "",
+                          });
+                          if (!user.aesKeyPlain) {
+                            // If user doesn't have aesKeyPlain, show PIN dialog instead
+                            setOpenPinDialog(true);
+                            return;
+                          }
+                          setPreviewFileDialogOpen(true);
+                        }}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Download
+                      </DropdownMenuItem>
+                    )}
 
                     <DropdownMenuItem
                       onClick={(e) => {
@@ -361,11 +398,12 @@ export function FileGrid() {
                           id: +file.id,
                           name: file.name,
                           type: file.type === "folder" ? "folder" : "file",
-                          size: file.size ? +file.size : 0,
+                          size: file.size ?? 0,
                           mimeType:
                             file.type === "folder"
                               ? "application/octet-stream"
                               : file.type,
+                          objectKey: file.objectKey ?? "",
                         });
                         setMoveFileDialogOpen(true);
                       }}
@@ -381,11 +419,12 @@ export function FileGrid() {
                           id: +file.id,
                           name: file.name,
                           type: file.type === "folder" ? "folder" : "file",
-                          size: file.size ? +file.size : 0,
+                          size: file.size ?? 0,
                           mimeType:
                             file.type === "folder"
                               ? "application/octet-stream"
                               : file.type,
+                          objectKey: file.objectKey ?? "",
                         });
                         setRenameFileDialogOpen(true);
                       }}
@@ -402,11 +441,12 @@ export function FileGrid() {
                           id: +file.id,
                           name: file.name,
                           type: file.type === "folder" ? "folder" : "file",
-                          size: file.size ? +file.size : 0,
+                          size: file.size ?? 0,
                           mimeType:
                             file.type === "folder"
                               ? "application/octet-stream"
                               : file.type,
+                          objectKey: file.objectKey ?? "",
                         });
                         setDeleteFileDialogOpen(true);
                       }}
@@ -425,7 +465,9 @@ export function FileGrid() {
                   <span>{file.modified}</span>
                 </div>
                 {file.size && (
-                  <p className="text-xs text-muted-foreground">{file.size}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {file.sizeFormatted}
+                  </p>
                 )}
               </div>
 
@@ -457,11 +499,7 @@ export function FileGrid() {
               <div
                 key={file.key}
                 className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors cursor-pointer group"
-                onClick={() =>
-                  file.type === "folder"
-                    ? handleFolderClick(file.id)
-                    : undefined
-                }
+                onClick={() => handleFileClick(file)}
               >
                 <div className="flex items-center gap-4 flex-1 min-w-0">
                   <div className="p-2 rounded-lg bg-muted/50">
@@ -471,7 +509,7 @@ export function FileGrid() {
                     <h3 className="font-medium truncate">{file.name}</h3>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <span>{file.modified}</span>
-                      {file.size && <span>{file.size}</span>}
+                      {file.size && <span>{file.sizeFormatted}</span>}
                       {file.encrypted && (
                         <span className="flex items-center gap-1 text-primary">
                           <svg
@@ -509,25 +547,33 @@ export function FileGrid() {
                     align="end"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedFile({
-                          id: +file.id,
-                          name: file.name,
-                          type: file.type === "folder" ? "folder" : "file",
-                          size: file.size ? +file.size : 0,
-                          mimeType:
-                            file.type === "folder"
-                              ? "application/octet-stream"
-                              : file.type,
-                        });
-                        setDownloadFileDialogOpen(true);
-                      }}
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      Download
-                    </DropdownMenuItem>
+                    {file.type !== "folder" && (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFile({
+                            id: +file.id,
+                            name: file.name,
+                            type: file.type === "folder" ? "folder" : "file",
+                            size: file.size ?? 0,
+                            objectKey: file.objectKey ?? "",
+                            mimeType:
+                              file.type === "folder"
+                                ? "application/octet-stream"
+                                : file.type,
+                          });
+                          if (!user.aesKeyPlain) {
+                            // If user doesn't have aesKeyPlain, show PIN dialog instead
+                            setOpenPinDialog(true);
+                            return;
+                          }
+                          setPreviewFileDialogOpen(true);
+                        }}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Download
+                      </DropdownMenuItem>
+                    )}
 
                     <DropdownMenuItem
                       onClick={(e) => {
@@ -536,11 +582,12 @@ export function FileGrid() {
                           id: +file.id,
                           name: file.name,
                           type: file.type === "folder" ? "folder" : "file",
-                          size: file.size ? +file.size : 0,
+                          size: file.size ?? 0,
                           mimeType:
                             file.type === "folder"
                               ? "application/octet-stream"
                               : file.type,
+                          objectKey: file.objectKey ?? "",
                         });
                         setMoveFileDialogOpen(true);
                       }}
@@ -556,11 +603,12 @@ export function FileGrid() {
                           id: +file.id,
                           name: file.name,
                           type: file.type === "folder" ? "folder" : "file",
-                          size: file.size ? +file.size : 0,
+                          size: file.size ?? 0,
                           mimeType:
                             file.type === "folder"
                               ? "application/octet-stream"
                               : file.type,
+                          objectKey: file.objectKey ?? "",
                         });
                         setRenameFileDialogOpen(true);
                       }}
@@ -577,11 +625,12 @@ export function FileGrid() {
                           id: +file.id,
                           name: file.name,
                           type: file.type === "folder" ? "folder" : "file",
-                          size: file.size ? +file.size : 0,
+                          size: file.size ?? 0,
                           mimeType:
                             file.type === "folder"
                               ? "application/octet-stream"
                               : file.type,
+                          objectKey: file.objectKey ?? "",
                         });
                         setDeleteFileDialogOpen(true);
                       }}
@@ -647,6 +696,7 @@ export function FileGrid() {
             type: "file",
             size: 0,
             mimeType: "",
+            objectKey: "",
           }
         }
         open={moveFileDialogOpen}
@@ -660,6 +710,7 @@ export function FileGrid() {
             type: "file",
             size: 0,
             mimeType: "",
+            objectKey: "",
           }
         }
         open={deleteFileDialogOpen}
@@ -673,12 +724,14 @@ export function FileGrid() {
             type: "file",
             size: 0,
             mimeType: "",
+            objectKey: "",
           }
         }
         open={renameFileDialogOpen}
         setOpen={setRenameFileDialogOpen}
       />
-      <DownloadFileDialog
+
+      <PreviewFileDialog
         file={
           selectedFile ?? {
             id: 0,
@@ -686,10 +739,16 @@ export function FileGrid() {
             type: "file",
             size: 0,
             mimeType: "",
+            objectKey: "",
           }
         }
-        open={downloadFileDialogOpen}
-        setOpen={setDownloadFileDialogOpen}
+        open={previewFileDialogOpen}
+        setOpen={setPreviewFileDialogOpen}
+      />
+      <DecryptPinDialog
+        open={openPinDialog}
+        setOpen={setOpenPinDialog}
+        onSuccess={() => setPreviewFileDialogOpen(true)}
       />
     </div>
   );

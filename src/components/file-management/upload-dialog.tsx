@@ -1,6 +1,6 @@
 import type React from "react";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,20 +15,20 @@ import { Upload, FileIcon, X, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import useUserStore from "@/store/user";
-import usePinDialogStore from "@/store/pinDialog";
+
 import { sanitizeFileName, shortenFileName } from "@/utils/common";
 import cryptoUtils from "@/utils/crypto";
 import ghostDriveApi from "@/apis/ghost-drive-api";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
+import DecryptPinDialog from "../DecryptPinDialog";
 
 export function UploadDialog({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [shouldAutoOpen, setShouldAutoOpen] = useState(false);
   const { user } = useUserStore();
-  const { setOpen: setOpenPinDialog } = usePinDialogStore();
+  const [openPinDialog, setOpenPinDialog] = useState(false);
   const queryClient = useQueryClient();
   const [progress, setProgress] = useState({
     percent: 0,
@@ -116,24 +116,14 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const handleDialogOpenChange = (newOpen: boolean) => {
-    if (newOpen && !user.aesKeyPlain) {
+  const handleDialogOpenChange = (isOpen: boolean) => {
+    if (!user.aesKeyPlain && isOpen) {
       // If user doesn't have aesKeyPlain, show PIN dialog instead
       setOpenPinDialog(true);
-      setShouldAutoOpen(true); // Mark that we should auto-open after PIN
       return;
     }
-    setOpen(newOpen);
-    setShouldAutoOpen(false); // Reset auto-open flag when manually closed
+    setOpen(isOpen);
   };
-
-  // Auto-open upload dialog when aesKeyPlain becomes available (only if we should)
-  useEffect(() => {
-    if (user.aesKeyPlain && shouldAutoOpen && !open) {
-      setOpen(true);
-      setShouldAutoOpen(false);
-    }
-  }, [user.aesKeyPlain, shouldAutoOpen, open]);
 
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
@@ -182,7 +172,9 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
               <FileIcon className="h-8 w-8 text-primary flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
-                  <p className="text-sm font-medium truncate">{shortenFileName(file.name)}</p>
+                  <p className="text-sm font-medium truncate">
+                    {shortenFileName(file.name)}
+                  </p>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -214,6 +206,11 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
           </Button>
         </div>
       </DialogContent>
+      <DecryptPinDialog
+        open={openPinDialog}
+        setOpen={setOpenPinDialog}
+        onSuccess={() => setOpen(true)}
+      />
     </Dialog>
   );
 }

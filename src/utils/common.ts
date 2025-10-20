@@ -17,3 +17,8 @@ export const shortenFileName = (fileName: string) => {
   if (fileName.length <= 20) return fileName;
   return fileName.slice(0, 16) + '...' + fileName.slice(-4);
 }
+
+export const getFileExtension = (fileName: string) => {
+  const parts = fileName.split('.');
+  return parts.pop();
+}
