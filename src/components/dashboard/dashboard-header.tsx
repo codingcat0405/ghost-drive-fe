@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { UploadDialog } from "../file-management/upload-dialog";
 import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 
 export function DashboardHeader() {
   const navigate = useNavigate();
@@ -26,14 +27,22 @@ export function DashboardHeader() {
     navigate("/login");
     toast.success("Logged out successfully");
   };
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery] = useDebounce(searchQuery, 500);
   useEffect(() => {
     if (debouncedSearchQuery) {
-      navigate(`/?q=${debouncedSearchQuery.trim()}`);
+      setSearchParams((prev) => {
+        const newParams = new URLSearchParams(prev);
+        newParams.set("q", debouncedSearchQuery.trim());
+        return newParams;
+      });
     } else {
-      navigate("/");
+      setSearchParams((prev) => {
+        const newParams = new URLSearchParams(prev);
+        newParams.delete("q");
+        return newParams;
+      });
     }
   }, [debouncedSearchQuery]);
   useEffect(() => {
@@ -85,16 +94,23 @@ export function DashboardHeader() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
-                <User className="h-5 w-5" />
+                {user?.avatar ? (
+                  <Avatar className="h-5 w-5">
+                    <AvatarImage src={user.avatar} />
+                    <AvatarFallback>
+                      {user.fullName?.charAt(0) || "GD"}
+                    </AvatarFallback>
+                  </Avatar>
+                ) : (
+                  <User className="h-5 w-5" />
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium">{user?.username}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {user?.bucketName}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -116,4 +132,3 @@ export function DashboardHeader() {
     </header>
   );
 }
-

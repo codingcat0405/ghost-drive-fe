@@ -14,9 +14,11 @@ import { User, Mail, Camera } from "lucide-react";
 import { toast } from "sonner";
 import useUserStore from "@/store/user";
 import ghostDriveApi from "@/apis/ghost-drive-api";
+import { sanitizeFileName } from "@/utils/common";
+import axios from "axios";
 
 export function AccountSettings() {
-  const { user } = useUserStore();
+  const { user, setUser } = useUserStore();
   const [name, setName] = useState(user.fullName || "");
   const [email, setEmail] = useState(user.email || "");
   const [isSaving, setIsSaving] = useState(false);
@@ -26,12 +28,24 @@ export function AccountSettings() {
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      await ghostDriveApi.user.updateUserInfo({
+      let avatar = user.avatar;
+      if (file) {
+        //upload file to s3
+        const { presignedUrl, downloadUrl } =
+          await ghostDriveApi.upload.commonUploadPresignedUrl(
+            sanitizeFileName(file.name)
+          );
+        await axios.put(presignedUrl, file);
+        avatar = downloadUrl;
+      }
+      const response = await ghostDriveApi.user.updateUserInfo({
         fullName: name,
         email: email,
-        // avatar: previewAvatar,
+        avatar: avatar,
       });
-    } catch(err: any) {
+      setUser(response);
+      toast.success("Profile updated successfully");
+    } catch (err: any) {
       toast.error(err.message);
       console.error(err);
     } finally {

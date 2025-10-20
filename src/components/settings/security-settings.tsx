@@ -10,14 +10,144 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Lock, Key, Smartphone, Shield, AlertTriangle } from "lucide-react";
+import {
+  Lock,
+  Key,
+  Smartphone,
+  Shield,
+  AlertTriangle,
+  CheckCircle2,
+  X,
+  Loader2,
+  EyeOff,
+  Eye,
+} from "lucide-react";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "../ui/input-otp";
+import { toast } from "sonner";
+import useUserStore from "@/store/user";
+import cryptoUtils from "@/utils/crypto";
+import ghostDriveApi from "@/apis/ghost-drive-api";
 
 export function SecuritySettings() {
+  const { user, setUser } = useUserStore();
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  const [currentPin, setCurrentPin] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [pinUpdateSuccess, setPinUpdateSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const handleUpdatePin = async () => {
+    setIsLoading(true);
+    if (newPin !== confirmPin) {
+      toast.error("PINs do not match");
+      return;
+    }
+    if (newPin.length !== 6) {
+      toast.error("Please enter a 6-digit PIN");
+      return;
+    }
+    if (currentPin.length !== 6) {
+      toast.error("Please enter a 6-digit PIN");
+      return;
+    }
+    try {
+      const aesKeyPlain = await cryptoUtils.decryptFileEncryptionKey(
+        user.aesKeyEncrypted,
+        currentPin
+      );
+      const newEncryptedKey = await cryptoUtils.encryptFileEncryptionKey(
+        aesKeyPlain,
+        newPin
+      );
+      const updatedUser = await ghostDriveApi.user.updateAesKeyEncrypted(
+        newEncryptedKey
+      );
+      setUser({
+        ...user,
+        aesKeyEncrypted: updatedUser.aesKeyEncrypted,
+      });
+      setPinUpdateSuccess(true);
+      toast.success("PIN updated successfully");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message);
+      setPinUpdateSuccess(false);
+    } finally {
+      setIsLoading(false);
+      setCurrentPin("");
+      setNewPin("");
+      setConfirmPin("");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+  };
+
+  const pinMatch = newPin === confirmPin && newPin.length === 6;
+
+  const [showEncryptionKey, setShowEncryptionKey] = useState(false);
+  const [showKeyPinDialog, setShowKeyPinDialog] = useState(false);
+  const [keyVerificationPin, setKeyVerificationPin] = useState("");
+  const [keyPinVerified, setKeyPinVerified] = useState(false);
+
+  const encryptionKey = "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0";
+  const maskedKey = "•".repeat(encryptionKey.length);
+
+  const handleVerifyKeyPin = () => {
+    if (keyVerificationPin.length === 6) {
+      // TODO: Verify PIN with backend
+      setKeyPinVerified(true);
+      setShowEncryptionKey(true);
+      setShowKeyPinDialog(false);
+      console.log("[v0] Encryption key PIN verified");
+    }
+  };
+
+  const handleHideKey = () => {
+    setShowEncryptionKey(false);
+    setKeyPinVerified(false);
+    setKeyVerificationPin("");
+  };
+
+  const handleShowKeyClick = () => {
+    setShowKeyPinDialog(true);
+  };
+
+  const handleUpdatePassword = async () => {
+    if (
+      currentPassword.length === 0 ||
+      newPassword.length === 0 ||
+      confirmPassword.length === 0
+    ) {
+      toast.error("Please enter all fields");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    try {
+      setIsLoading(true);
+      const updatedUser = await ghostDriveApi.user.updatePassword({
+        oldPassword: currentPassword,
+        newPassword: newPassword,
+      });
+      setUser(updatedUser);
+      toast.success("Password updated successfully");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message);
+    } finally {
+      setIsLoading(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+  };
   return (
     <div className="space-y-6">
       <Card className="border-border/50 bg-card/50">
@@ -70,8 +200,127 @@ export function SecuritySettings() {
             </div>
           </div>
 
-          <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-            Update Password
+          <Button
+            onClick={handleUpdatePassword}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              "Update Password"
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/50 bg-card/50">
+        <CardHeader>
+          <CardTitle>Update Encryption PIN</CardTitle>
+          <CardDescription>
+            Change your 6-digit PIN used for file encryption and decryption
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <Label htmlFor="current-pin">Current PIN</Label>
+              <div className="flex justify-center">
+                <InputOTP
+                  maxLength={6}
+                  value={currentPin}
+                  onChange={setCurrentPin}
+                >
+                  <InputOTPGroup>
+                    <InputOTPSlot type="password" index={0} />
+                    <InputOTPSlot type="password" index={1} />
+                    <InputOTPSlot type="password" index={2} />
+                    <InputOTPSlot type="password" index={3} />
+                    <InputOTPSlot type="password" index={4} />
+                    <InputOTPSlot type="password" index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label htmlFor="new-pin">New PIN</Label>
+              <div className="flex justify-center">
+                <InputOTP maxLength={6} value={newPin} onChange={setNewPin}>
+                  <InputOTPGroup>
+                    <InputOTPSlot type="password" index={0} />
+                    <InputOTPSlot type="password" index={1} />
+                    <InputOTPSlot type="password" index={2} />
+                    <InputOTPSlot type="password" index={3} />
+                    <InputOTPSlot type="password" index={4} />
+                    <InputOTPSlot type="password" index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label htmlFor="confirm-pin">Confirm New PIN</Label>
+              <div className="flex justify-center">
+                <InputOTP
+                  maxLength={6}
+                  value={confirmPin}
+                  onChange={setConfirmPin}
+                >
+                  <InputOTPGroup>
+                    <InputOTPSlot type="password" index={0} />
+                    <InputOTPSlot type="password" index={1} />
+                    <InputOTPSlot type="password" index={2} />
+                    <InputOTPSlot type="password" index={3} />
+                    <InputOTPSlot type="password" index={4} />
+                    <InputOTPSlot type="password" index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+
+              {confirmPin.length === 6 && (
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  {pinMatch ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                      <span className="text-sm text-primary">PINs match</span>
+                    </>
+                  ) : (
+                    <>
+                      <X className="h-4 w-4 text-destructive" />
+                      <span className="text-sm text-destructive">
+                        PINs do not match
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {pinUpdateSuccess && (
+            <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <div>
+                  <h4 className="font-medium text-sm mb-1">
+                    PIN Updated Successfully
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    Your encryption PIN has been updated. Use your new PIN to
+                    decrypt files.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <Button
+            onClick={handleUpdatePin}
+            disabled={!pinMatch || currentPin.length !== 6 || isLoading}
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Update PIN
           </Button>
         </CardContent>
       </Card>
@@ -140,32 +389,32 @@ export function SecuritySettings() {
                   This key is used to encrypt and decrypt your files. Keep it
                   safe and never share it.
                 </p>
-                <code className="text-xs bg-background p-2 rounded block overflow-x-auto">
-                  a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0
-                </code>
+                <div className="flex items-center gap-2">
+                  <code className="text-xs bg-background p-2 rounded flex-1 overflow-x-auto font-mono">
+                    {showEncryptionKey ? encryptionKey : maskedKey}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={
+                      showEncryptionKey ? handleHideKey : handleShowKeyClick
+                    }
+                    className="flex-shrink-0 bg-transparent"
+                  >
+                    {showEncryptionKey ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                {showEncryptionKey && (
+                  <p className="text-xs text-primary mt-2">
+                    ✓ Key is visible. Click the eye icon to hide it.
+                  </p>
+                )}
               </div>
             </div>
-          </div>
-
-          <div className="p-4 bg-destructive/5 rounded-lg border border-destructive/20">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
-              <div>
-                <h4 className="font-medium text-sm mb-1 text-destructive">
-                  Important
-                </h4>
-                <p className="text-xs text-muted-foreground">
-                  If you lose your encryption key, you will not be able to
-                  access your files. We cannot recover your data without this
-                  key.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <Button variant="outline">Download Key</Button>
-            <Button variant="outline">Regenerate Key</Button>
           </div>
         </CardContent>
       </Card>

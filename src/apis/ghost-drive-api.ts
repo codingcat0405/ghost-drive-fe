@@ -39,8 +39,14 @@ const ghostDriveApi = {
       avatar?: string;
       fullName?: string;
       email?: string;
-    }) => {
+    }): Promise<User> => {
       return await axiosClient.put("/users", data);
+    },
+    updatePassword: async (data: {
+      oldPassword: string;
+      newPassword: string;
+    }): Promise<User> => {
+      return await axiosClient.put("/users/update-password", data);
     }
   },
   file: {
@@ -116,6 +122,12 @@ const ghostDriveApi = {
     },
     completeUploadMultipart: (objectName: string, uploadId: string, parts: Array<{ PartNumber: number; ETag: string }>): Promise<void> => {
       return axiosClient.post(`/upload/complete-multipart-upload`, { objectKey: objectName, uploadId, parts });
+    },
+    commonUploadPresignedUrl: (objectKey: string): Promise<{
+      presignedUrl: string;
+      downloadUrl: string;
+    }> => {
+      return axiosClient.post(`/upload/common/upload-url`, { objectKey });
     },
   },
   folder: {
