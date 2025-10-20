@@ -23,6 +23,8 @@ import {
   List,
   Clock,
   SlashIcon,
+  X,
+  Search,
 } from "lucide-react";
 import {
   Breadcrumb,
@@ -115,11 +117,12 @@ export function FileGrid() {
   // Get page and folder from URL or default values
   const currentPage = parseInt(searchParams.get("page") || "1", 10);
   const currentFolderId = searchParams.get("folder") || undefined;
-
+  const searchQuery = searchParams.get("q") || undefined;
   const [params, setParams] = useState({
     folderId: currentFolderId ? parseInt(currentFolderId) : undefined,
     page: currentPage,
     limit: 9,
+    searchQuery: searchQuery,
   });
 
   // Update fileParams when URL changes
@@ -128,13 +131,23 @@ export function FileGrid() {
       ...prev,
       page: currentPage,
       folderId: currentFolderId ? parseInt(currentFolderId) : undefined,
+      searchQuery: searchQuery,
     }));
-  }, [currentPage, currentFolderId]);
+  }, [currentPage, currentFolderId, searchQuery]);
 
   const { data: folderContentsData, isLoading } = useQuery({
     queryKey: ["folder-contents", params],
-    queryFn: ({ queryKey }) =>
-      ghostDriveApi.folder.contents(queryKey[1] as any),
+    queryFn: async ({ queryKey }) => {
+      if ((queryKey[1] as any).searchQuery) {
+        return await ghostDriveApi.file.searchFiles({
+          q: (queryKey[1] as any).searchQuery,
+          page: (queryKey[1] as any).page,
+          limit: (queryKey[1] as any).limit,
+        });
+      } else {
+        return await ghostDriveApi.folder.contents(queryKey[1] as any);
+      }
+    },
   });
 
   const { data: parentTreeData = [] } = useQuery({
@@ -267,47 +280,85 @@ export function FileGrid() {
           </Button>
         </div>
       </div>
-      <Breadcrumb>
-        <BreadcrumbList>
-          {parentTreeData.length === 0 ? (
-            <>
-              <BreadcrumbPage>
-                <BreadcrumbLink>My Drive</BreadcrumbLink>
-              </BreadcrumbPage>
-              <BreadcrumbSeparator>
-                <SlashIcon />
-              </BreadcrumbSeparator>
-            </>
-          ) : (
-            parentTreeData.map((item) => (
+      {searchQuery ? (
+        <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="flex-shrink-0 p-2 rounded-md bg-primary/20">
+              <Search className="h-4 w-4 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground">
+                Search results for{" "}
+                <span className="font-semibold text-primary">
+                  "{searchQuery}"
+                </span>
+              </p>
+
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {folderContentsData?.totalElements} found
+              </p>
+            </div>
+          </div>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearchParams((prev) => {
+                const newParams = new URLSearchParams(prev);
+                newParams.delete("q");
+                return newParams;
+              });
+            }}
+            className="flex-shrink-0 hover:bg-destructive/10 hover:text-destructive transition-colors"
+          >
+            <X className="h-4 w-4 mr-1.5" />
+            <span className="hidden sm:inline">Clear</span>
+          </Button>
+        </div>
+      ) : (
+        <Breadcrumb>
+          <BreadcrumbList>
+            {parentTreeData.length === 0 ? (
               <>
-                {+item.id === +currentFolderId! ? (
-                  <BreadcrumbItem key={item.id}>
-                    <BreadcrumbPage
-                      onClick={() => handleFolderClick(item.id.toString())}
-                      className="cursor-pointer"
-                    >
-                      {item.name == "/" ? "My Drive" : item.name}
-                    </BreadcrumbPage>
-                  </BreadcrumbItem>
-                ) : (
-                  <BreadcrumbItem key={item.id}>
-                    <BreadcrumbLink
-                      onClick={() => handleFolderClick(item.id.toString())}
-                      className="cursor-pointer"
-                    >
-                      {item.name == "/" ? "My Drive" : item.name}
-                    </BreadcrumbLink>
-                  </BreadcrumbItem>
-                )}
+                <BreadcrumbPage>
+                  <BreadcrumbLink>My Drive</BreadcrumbLink>
+                </BreadcrumbPage>
                 <BreadcrumbSeparator>
                   <SlashIcon />
                 </BreadcrumbSeparator>
               </>
-            ))
-          )}
-        </BreadcrumbList>
-      </Breadcrumb>
+            ) : (
+              parentTreeData.map((item) => (
+                <>
+                  {+item.id === +currentFolderId! ? (
+                    <BreadcrumbItem key={item.id}>
+                      <BreadcrumbPage
+                        onClick={() => handleFolderClick(item.id.toString())}
+                        className="cursor-pointer"
+                      >
+                        {item.name == "/" ? "My Drive" : item.name}
+                      </BreadcrumbPage>
+                    </BreadcrumbItem>
+                  ) : (
+                    <BreadcrumbItem key={item.id}>
+                      <BreadcrumbLink
+                        onClick={() => handleFolderClick(item.id.toString())}
+                        className="cursor-pointer"
+                      >
+                        {item.name == "/" ? "My Drive" : item.name}
+                      </BreadcrumbLink>
+                    </BreadcrumbItem>
+                  )}
+                  <BreadcrumbSeparator>
+                    <SlashIcon />
+                  </BreadcrumbSeparator>
+                </>
+              ))
+            )}
+          </BreadcrumbList>
+        </Breadcrumb>
+      )}
       <p className="text-sm text-muted-foreground">
         {paginationData
           ? `Showing ${

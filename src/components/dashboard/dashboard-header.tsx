@@ -9,11 +9,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Search, Upload, User, Settings, LogOut, Bell } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { ACCESS_TOKEN_KEY } from "@/constants";
 import useUserStore from "@/store/user";
 import { toast } from "sonner";
 import { UploadDialog } from "../file-management/upload-dialog";
+import { useEffect, useState } from "react";
+import { useDebounce } from "use-debounce";
 
 export function DashboardHeader() {
   const navigate = useNavigate();
@@ -24,6 +26,19 @@ export function DashboardHeader() {
     navigate("/login");
     toast.success("Logged out successfully");
   };
+  const [searchParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery] = useDebounce(searchQuery, 500);
+  useEffect(() => {
+    if (debouncedSearchQuery) {
+      navigate(`/?q=${debouncedSearchQuery.trim()}`);
+    } else {
+      navigate("/");
+    }
+  }, [debouncedSearchQuery]);
+  useEffect(() => {
+    setSearchQuery(searchParams.get("q") || "");
+  }, [searchParams]);
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 flex h-16 items-center justify-between">
@@ -47,6 +62,8 @@ export function DashboardHeader() {
           <div className="hidden md:flex relative w-96">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search files..."
               className="pl-10 bg-muted/50"
             />
@@ -99,3 +116,4 @@ export function DashboardHeader() {
     </header>
   );
 }
+

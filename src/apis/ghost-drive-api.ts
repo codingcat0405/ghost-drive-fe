@@ -77,8 +77,20 @@ const ghostDriveApi = {
     },
     deleteFileEntry: async (id: number) => {
       return await axiosClient.delete(`/files/${id}`)
+    },
+    searchFiles: async (params: {
+      q: string;
+      page?: number;
+      limit?: number;
+    }): Promise<{
+      contents: FolderContentItem[];
+      currentPage: number;
+      perPage: number;
+      totalPage: number;
+      totalElements: number;
+    }> => {
+      return await axiosClient.get("/files/search", { params });
     }
-
   },
   upload: {
     getUploadUrl: (objectKey: string): Promise<{ uploadUrl: string }> => {
