@@ -36,7 +36,7 @@ function canPreview(file: {
     return { canPreview: true };
   }
 
-  if (file.mimeType === "video") {
+  if (file.mimeType.includes("video")) {
     const sizeInBytes = file.size / 1024 / 1024; // convert to MB
     const maxSize = 100 * 1024 * 1024; // 100MB
     if (sizeInBytes > maxSize) {

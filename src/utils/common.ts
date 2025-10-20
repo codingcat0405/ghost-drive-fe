@@ -22,3 +22,7 @@ export const getFileExtension = (fileName: string) => {
   const parts = fileName.split('.');
   return parts.pop();
 }
+
+export const bytesToGB = (bytes: number, precision: number = 2) => {
+  return (bytes / 1024 / 1024 / 1024).toFixed(precision);
+}

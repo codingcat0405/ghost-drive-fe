@@ -106,6 +106,7 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
             });
             // Invalidate and refetch the files query to update the file grid
             queryClient.invalidateQueries({ queryKey: ["folder-contents"] });
+            queryClient.invalidateQueries({ queryKey: ["quota-report"] });
             setOpen(false);
           }
         }

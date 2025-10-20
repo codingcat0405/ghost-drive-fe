@@ -47,6 +47,16 @@ const ghostDriveApi = {
       newPassword: string;
     }): Promise<User> => {
       return await axiosClient.put("/users/update-password", data);
+    },
+    getQuotaReport: async (): Promise<{
+      totalStorage: number;
+      storageQuota: number;
+      totalStorageImage: number;
+      totalStorageVideo: number;
+      totalStorageAudio: number;
+      otherStorage: number;
+    }> => {
+      return await axiosClient.get("/users/report");
     }
   },
   file: {
