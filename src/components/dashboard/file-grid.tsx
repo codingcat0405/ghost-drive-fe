@@ -293,6 +293,7 @@ export function FileGrid() {
                   "{searchQuery}"
                 </span>
               </p>
+              
 
               <p className="text-xs text-muted-foreground mt-0.5">
                 {folderContentsData?.totalElements} found

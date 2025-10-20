@@ -14,6 +14,8 @@ export type User = {
   bucketName:string,
   aesKeyEncrypted: string,
   aesKeyPlain?: string,
+  fullName?: string,
+  email?: string
 }
 
 const defaultUser: User = {

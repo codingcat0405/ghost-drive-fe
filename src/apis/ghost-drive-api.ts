@@ -34,6 +34,13 @@ const ghostDriveApi = {
     },
     getUserInfo: (): Promise<User> => {
       return axiosClient.get("/users/me");
+    },
+    updateUserInfo: async (data: {
+      avatar?: string;
+      fullName?: string;
+      email?: string;
+    }) => {
+      return await axiosClient.put("/users", data);
     }
   },
   file: {
