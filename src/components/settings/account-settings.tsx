@@ -26,10 +26,10 @@ export function AccountSettings() {
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      await ghostDriveApi.user.updateUser({
+      await ghostDriveApi.user.updateUserInfo({
         fullName: name,
         email: email,
-        avatar: previewAvatar,
+        // avatar: previewAvatar,
       });
     } catch(err: any) {
       toast.error(err.message);
