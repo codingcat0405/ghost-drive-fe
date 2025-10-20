@@ -1,54 +1,42 @@
 import { Card } from "@/components/ui/card";
-import { Upload, FolderPlus, Link, FileText } from "lucide-react";
+import { Upload, FolderPlus } from "lucide-react";
 import { UploadDialog } from "@/components/file-management/upload-dialog";
 import { CreateFolderDialog } from "@/components/file-management/create-folder-dialog";
-import { ShareDialog } from "@/components/file-management/share-dialog";
-
 
 export function QuickActions() {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <UploadDialog>
-        <Card className="p-4 hover:bg-accent/50 transition-colors cursor-pointer border-border/50 bg-card/50">
-          <div className="flex flex-col items-center text-center space-y-2">
-            <div className="p-3 rounded-lg bg-primary/10">
-              <Upload className="h-5 w-5 text-primary" />
+        <Card className="p-6 hover:bg-accent/50 transition-all duration-200 cursor-pointer border-border/50 bg-gradient-to-br from-card/80 to-card/40 hover:shadow-lg hover:shadow-primary/10">
+          <div className="flex flex-col items-center text-center space-y-3">
+            <div className="p-4 rounded-xl bg-primary/15 group-hover:bg-primary/20 transition-colors">
+              <Upload className="h-6 w-6 text-primary" />
             </div>
-            <span className="text-sm font-medium">Upload Files</span>
+            <div>
+              <h3 className="text-base font-semibold">Upload Files</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Add files to your secure storage
+              </p>
+            </div>
           </div>
         </Card>
       </UploadDialog>
 
       <CreateFolderDialog>
-        <Card className="p-4 hover:bg-accent/50 transition-colors cursor-pointer border-border/50 bg-card/50">
-          <div className="flex flex-col items-center text-center space-y-2">
-            <div className="p-3 rounded-lg bg-primary/10">
-              <FolderPlus className="h-5 w-5 text-primary" />
+        <Card className="p-6 hover:bg-accent/50 transition-all duration-200 cursor-pointer border-border/50 bg-gradient-to-br from-card/80 to-card/40 hover:shadow-lg hover:shadow-primary/10">
+          <div className="flex flex-col items-center text-center space-y-3">
+            <div className="p-4 rounded-xl bg-primary/15 group-hover:bg-primary/20 transition-colors">
+              <FolderPlus className="h-6 w-6 text-primary" />
             </div>
-            <span className="text-sm font-medium">New Folder</span>
+            <div>
+              <h3 className="text-base font-semibold">New Folder</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Organize your files
+              </p>
+            </div>
           </div>
         </Card>
       </CreateFolderDialog>
-
-      <ShareDialog fileName="example.pdf">
-        <Card className="p-4 hover:bg-accent/50 transition-colors cursor-pointer border-border/50 bg-card/50">
-          <div className="flex flex-col items-center text-center space-y-2">
-            <div className="p-3 rounded-lg bg-primary/10">
-              <Link className="h-5 w-5 text-primary" />
-            </div>
-            <span className="text-sm font-medium">Share Link</span>
-          </div>
-        </Card>
-      </ShareDialog>
-
-      <Card className="p-4 hover:bg-accent/50 transition-colors cursor-pointer border-border/50 bg-card/50">
-        <div className="flex flex-col items-center text-center space-y-2">
-          <div className="p-3 rounded-lg bg-primary/10">
-            <FileText className="h-5 w-5 text-primary" />
-          </div>
-          <span className="text-sm font-medium">New Document</span>
-        </div>
-      </Card>
     </div>
   );
 }

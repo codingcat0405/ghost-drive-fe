@@ -15,18 +15,20 @@ import {
   Key,
   Smartphone,
   Shield,
-  AlertTriangle,
   CheckCircle2,
   X,
   Loader2,
   EyeOff,
   Eye,
+  Copy,
+  Check,
 } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "../ui/input-otp";
 import { toast } from "sonner";
 import useUserStore from "@/store/user";
 import cryptoUtils from "@/utils/crypto";
 import ghostDriveApi from "@/apis/ghost-drive-api";
+import DecryptPinDialog from "../DecryptPinDialog";
 
 export function SecuritySettings() {
   const { user, setUser } = useUserStore();
@@ -90,31 +92,15 @@ export function SecuritySettings() {
   const pinMatch = newPin === confirmPin && newPin.length === 6;
 
   const [showEncryptionKey, setShowEncryptionKey] = useState(false);
-  const [showKeyPinDialog, setShowKeyPinDialog] = useState(false);
-  const [keyVerificationPin, setKeyVerificationPin] = useState("");
-  const [keyPinVerified, setKeyPinVerified] = useState(false);
-
-  const encryptionKey = "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0";
-  const maskedKey = "•".repeat(encryptionKey.length);
-
-  const handleVerifyKeyPin = () => {
-    if (keyVerificationPin.length === 6) {
-      // TODO: Verify PIN with backend
-      setKeyPinVerified(true);
-      setShowEncryptionKey(true);
-      setShowKeyPinDialog(false);
-      console.log("[v0] Encryption key PIN verified");
+  const [openPinDialog, setOpenPinDialog] = useState(false);
+  const maskedKey = "•".repeat(80);
+  const [keyCopied, setKeyCopied] = useState(false);
+  const handleEyeClick = () => {
+    if (showEncryptionKey) {
+      setShowEncryptionKey(false);
+      return;
     }
-  };
-
-  const handleHideKey = () => {
-    setShowEncryptionKey(false);
-    setKeyPinVerified(false);
-    setKeyVerificationPin("");
-  };
-
-  const handleShowKeyClick = () => {
-    setShowKeyPinDialog(true);
+    setOpenPinDialog(true);
   };
 
   const handleUpdatePassword = async () => {
@@ -148,6 +134,17 @@ export function SecuritySettings() {
       setConfirmPassword("");
     }
   };
+  const handleCopyKey = async () => {
+    try {
+      await navigator.clipboard.writeText(user.aesKeyEncrypted);
+      setKeyCopied(true);
+      toast.success("Encryption key copied to clipboard");
+      setTimeout(() => setKeyCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy key:", err);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card className="border-border/50 bg-card/50">
@@ -391,14 +388,27 @@ export function SecuritySettings() {
                 </p>
                 <div className="flex items-center gap-2">
                   <code className="text-xs bg-background p-2 rounded flex-1 overflow-x-auto font-mono">
-                    {showEncryptionKey ? encryptionKey : maskedKey}
+                    {showEncryptionKey ? user.aesKeyEncrypted : maskedKey}
                   </code>
+                  {showEncryptionKey && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCopyKey}
+                      className="flex-shrink-0 bg-transparent"
+                      title="Copy encryption key"
+                    >
+                      {keyCopied ? (
+                        <Check className="h-4 w-4 text-primary" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={
-                      showEncryptionKey ? handleHideKey : handleShowKeyClick
-                    }
+                    onClick={handleEyeClick}
                     className="flex-shrink-0 bg-transparent"
                   >
                     {showEncryptionKey ? (
@@ -418,6 +428,11 @@ export function SecuritySettings() {
           </div>
         </CardContent>
       </Card>
+      <DecryptPinDialog
+        open={openPinDialog}
+        setOpen={setOpenPinDialog}
+        onSuccess={() => setShowEncryptionKey(true)}
+      />
     </div>
   );
 }

@@ -54,6 +54,8 @@ export function RegisterForm() {
         aesKeyEncrypted: loginResponse.user.aesKeyEncrypted || "",
         role: loginResponse.user.role,
         username: loginResponse.user.username,
+        fullName: loginResponse.user.fullName,
+        email: loginResponse.user.email,
       });
       navigate("/");
     } catch (error) {

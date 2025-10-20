@@ -41,6 +41,8 @@ export function LoginForm() {
         role: response.user.role,
         username: response.user.username,
         avatar: response.user.avatar,
+        fullName: response.user.fullName,
+        email: response.user.email,
       });
       toast.success("Login successful");
       navigate("/");
