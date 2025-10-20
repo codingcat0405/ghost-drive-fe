@@ -231,14 +231,15 @@ export function PreviewFileDialog({
                 </div>
 
                 <div className="flex gap-2 pt-4 w-full">
-                  <Button onClick={onDownload} className="flex-1">
+                  <Button onClick={onDownload} className="flex-1" disabled={decrypting}>
                     <Download className="mr-2 h-4 w-4" />
-                    Download File
+                    {decrypting ? "Decrypting..." : "Download File"}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => setOpen(false)}
                     className="flex-1 bg-transparent"
+                    disabled={decrypting}
                   >
                     Close
                   </Button>

@@ -74,6 +74,7 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
     console.log("file", file);
 
     try {
+      setUploading(true);
       const currentFolderId = searchParams.get("folder")
         ? parseInt(searchParams.get("folder")!)
         : undefined;
@@ -158,6 +159,7 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
             onChange={handleFileInput}
             className="hidden"
             id="file-upload"
+            disabled={uploading}
           />
           <Button asChild variant="outline">
             <label htmlFor="file-upload" className="cursor-pointer">
@@ -176,6 +178,7 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
                     {shortenFileName(file.name)}
                   </p>
                   <Button
+                    disabled={uploading}
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6 flex-shrink-0"
