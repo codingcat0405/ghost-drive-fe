@@ -47,6 +47,11 @@ export function RegisterForm() {
         username,
         password,
       });
+      //this check just to pass the type check because when login for the first time
+      //no fa enabled so API always returns requiresTwoFactor as false and full the user and jwt data
+      if(!loginResponse.jwt || !loginResponse.user) {
+        throw new Error("Failed to login");
+      }
       localStorage.setItem(ACCESS_TOKEN_KEY, loginResponse.jwt);
       setUser({
         id: loginResponse.user.id,
