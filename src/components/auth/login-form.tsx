@@ -17,11 +17,15 @@ import { ACCESS_TOKEN_KEY } from "@/constants";
 import { useNavigate } from "react-router";
 import useUserStore from "@/store/user";
 import { toast } from "sonner";
+import { TwoFactorVerifyDialog } from "./two-factor-verify-dialog";
 
 export function LoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [openTwoFactorVerifyDialog, setOpenTwoFactorVerifyDialog] =
+    useState(false);
+  const [verifyingTwoFactor, setVerifyingTwoFactor] = useState(false);
   const navigate = useNavigate();
   const { setUser } = useUserStore();
 
@@ -32,6 +36,45 @@ export function LoginForm() {
       const response = await ghostDriveApi.user.login({
         username,
         password,
+      });
+      //not requires two factor, login successful
+      if (!response.requiresTwoFactor && response.jwt && response.user) {
+        localStorage.setItem(ACCESS_TOKEN_KEY, response.jwt);
+        setUser({
+          id: response.user.id,
+          bucketName: response.user.bucketName,
+          aesKeyEncrypted: response.user.aesKeyEncrypted || "",
+          role: response.user.role,
+          username: response.user.username,
+          avatar: response.user.avatar,
+          fullName: response.user.fullName,
+          email: response.user.email,
+        });
+        toast.success("Login successful");
+        navigate("/");
+        return;
+      } else {
+        //requires two factor, open verify dialog
+        setOpenTwoFactorVerifyDialog(true);
+      }
+    } catch (error: any) {
+      toast.error(error.message);
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyTwoFactor = async (code: string) => {
+    try {
+      if (!username) {
+        toast.error("Please enter your username");
+        return;
+      }
+      setVerifyingTwoFactor(true);
+      const response = await ghostDriveApi.twoFactor.verify({
+        token: code,
+        username,
       });
       localStorage.setItem(ACCESS_TOKEN_KEY, response.jwt);
       setUser({
@@ -46,11 +89,12 @@ export function LoginForm() {
       });
       toast.success("Login successful");
       navigate("/");
+      return;
     } catch (error: any) {
-      toast.error(error.message);
       console.error(error);
+      toast.error(error.message);
     } finally {
-      setIsLoading(false);
+      setVerifyingTwoFactor(false);
     }
   };
 
@@ -123,6 +167,12 @@ export function LoginForm() {
           </div>
         </div>
       </CardContent>
+      <TwoFactorVerifyDialog
+        open={openTwoFactorVerifyDialog}
+        setOpen={setOpenTwoFactorVerifyDialog}
+        onVerify={handleVerifyTwoFactor}
+        isVerifying={verifyingTwoFactor}
+      />
     </Card>
   );
 }

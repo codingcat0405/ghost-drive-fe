@@ -30,14 +30,30 @@ import cryptoUtils from "@/utils/crypto";
 import ghostDriveApi from "@/apis/ghost-drive-api";
 import DecryptPinDialog from "../DecryptPinDialog";
 import { shortenFileName } from "@/utils/common";
+import { useQuery } from "@tanstack/react-query";
+import { TwoFactorSetupDialog } from "../auth/two-factor-setup-dialog";
 
 export function SecuritySettings() {
   const { user, setUser } = useUserStore();
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+
+  const {
+    data: twoFactorStatus = { enabled: false, hasSecret: false },
+    refetch: refetchTwoFactorStatus,
+  } = useQuery({
+    queryKey: ["two-factor-status"],
+    queryFn: () => ghostDriveApi.twoFactor.status(),
+  });
+
+  const [openTwoFactorSetupDialog, setOpenTwoFactorSetupDialog] =
+    useState(false);
+  const [twoFactorSecret, setTwoFactorSecret] = useState("");
+  const [twoFactorQrCode, setTwoFactorQrCode] = useState("");
+
+  //change password
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
+  //update encryption PIN
   const [currentPin, setCurrentPin] = useState("");
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
@@ -89,7 +105,7 @@ export function SecuritySettings() {
       setConfirmPassword("");
     }
   };
-
+  //show-hide encryption key
   const pinMatch = newPin === confirmPin && newPin.length === 6;
 
   const [showEncryptionKey, setShowEncryptionKey] = useState(false);
@@ -144,6 +160,43 @@ export function SecuritySettings() {
     } catch (err) {
       console.error("Failed to copy key:", err);
     }
+  };
+  const setupTwoFactor = async () => {
+    try {
+      setIsLoading(true);
+      const { secret, qrcode } = await ghostDriveApi.twoFactor.setup();
+      setTwoFactorSecret(secret);
+      setTwoFactorQrCode(qrcode);
+      setOpenTwoFactorSetupDialog(true);
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  const disableTwoFactor = async () => {
+    try {
+      setIsLoading(true);
+      const success = await ghostDriveApi.twoFactor.disable();
+      if (!success) {
+        throw new Error("Failed to disable 2FA");
+      }
+      toast.success("2FA disabled successfully");
+      refetchTwoFactorStatus();
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  const handleToggleTwoFactor = async () => {
+    if (!twoFactorStatus.enabled) {
+      await setupTwoFactor();
+      return;
+    }
+    await disableTwoFactor();
   };
 
   return (
@@ -344,12 +397,13 @@ export function SecuritySettings() {
               </div>
             </div>
             <Switch
-              checked={twoFactorEnabled}
-              onCheckedChange={setTwoFactorEnabled}
+              disabled={isLoading}
+              checked={twoFactorStatus.enabled}
+              onCheckedChange={handleToggleTwoFactor}
             />
           </div>
 
-          {twoFactorEnabled && (
+          {twoFactorStatus.enabled && (
             <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
               <div className="flex items-start gap-2">
                 <Shield className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
@@ -389,7 +443,9 @@ export function SecuritySettings() {
                 </p>
                 <div className="flex items-center gap-2">
                   <code className="text-xs bg-background p-2 rounded flex-1 overflow-x-auto font-mono">
-                    {showEncryptionKey ? shortenFileName(user.aesKeyEncrypted) : maskedKey}
+                    {showEncryptionKey
+                      ? shortenFileName(user.aesKeyEncrypted)
+                      : maskedKey}
                   </code>
                   {showEncryptionKey && (
                     <Button
@@ -433,6 +489,15 @@ export function SecuritySettings() {
         open={openPinDialog}
         setOpen={setOpenPinDialog}
         onSuccess={() => setShowEncryptionKey(true)}
+      />
+      <TwoFactorSetupDialog
+        open={openTwoFactorSetupDialog}
+        setOpen={setOpenTwoFactorSetupDialog}
+        onComplete={() => {
+          refetchTwoFactorStatus();
+        }}
+        secret={twoFactorSecret}
+        qrCode={twoFactorQrCode}
       />
     </div>
   );

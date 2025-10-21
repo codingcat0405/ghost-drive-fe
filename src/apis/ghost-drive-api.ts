@@ -16,7 +16,7 @@ export interface FolderContentItem {
 
 const ghostDriveApi = {
   user: {
-    login: (data: { username: string; password: string }): Promise<{ user: User, jwt: string }> => {
+    login: (data: { username: string; password: string }): Promise<{ user?: User, jwt?: string, requiresTwoFactor?: boolean }> => {
       return axiosClient.post("/users/login", data);
     },
     register: (data: { username: string; password: string }) => {
@@ -231,6 +231,33 @@ const ghostDriveApi = {
       userId: number;
     }[]> => {
       return await axiosClient.get(`/folders/move-destinations`, { params });
+    },
+  },
+  twoFactor: {
+    setup: (): Promise<{
+      secret: string;
+      qrcode: string;
+    }> => {
+      return axiosClient.post("users/2fa/setup");
+    },
+    enable: (token: string): Promise<boolean> => {
+      return axiosClient.post("/users/2fa/enable", { token });
+    },
+    disable: (): Promise<boolean> => {
+      return axiosClient.post("/users/2fa/disable");
+    },
+    verify: (data: { token: string; username: string }): Promise<{
+      jwt: string;
+      user: User;
+      requiresTwoFactor: boolean;
+    }> => {
+      return axiosClient.post("/users/2fa/verify", data);
+    },
+    status: (): Promise<{
+      enabled: boolean;
+      hasSecret: boolean;
+    }> => {
+      return axiosClient.get("/users/2fa/status");
     },
   }
 };
