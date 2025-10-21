@@ -11,7 +11,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Lock, User } from "lucide-react";
 import ghostDriveApi from "@/apis/ghost-drive-api";
 import { ACCESS_TOKEN_KEY } from "@/constants";
@@ -22,7 +21,7 @@ export function RegisterForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
+ 
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { setUser } = useUserStore();
@@ -33,10 +32,6 @@ export function RegisterForm() {
       return;
     }
 
-    if (!agreedToTerms) {
-      alert("Please agree to the terms and conditions");
-      return;
-    }
     try {
       setIsLoading(true);
       await ghostDriveApi.user.register({
@@ -130,24 +125,7 @@ export function RegisterForm() {
             </div>
           </div>
 
-          <div className="flex items-start space-x-2">
-            <Checkbox
-              id="terms"
-              checked={agreedToTerms}
-              onCheckedChange={(checked) =>
-                setAgreedToTerms(checked as boolean)
-              }
-            />
-            <label
-              htmlFor="terms"
-              className="text-sm text-muted-foreground leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              I agree to the{" "}
-              <a href="/terms" className="text-primary hover:underline">
-                terms and conditions
-              </a>
-            </label>
-          </div>
+    
 
           <Button
             type="submit"
