@@ -29,6 +29,7 @@ import useUserStore from "@/store/user";
 import cryptoUtils from "@/utils/crypto";
 import ghostDriveApi from "@/apis/ghost-drive-api";
 import DecryptPinDialog from "../DecryptPinDialog";
+import { shortenFileName } from "@/utils/common";
 
 export function SecuritySettings() {
   const { user, setUser } = useUserStore();
@@ -93,7 +94,7 @@ export function SecuritySettings() {
 
   const [showEncryptionKey, setShowEncryptionKey] = useState(false);
   const [openPinDialog, setOpenPinDialog] = useState(false);
-  const maskedKey = "•".repeat(80);
+  const maskedKey = "•".repeat(10);
   const [keyCopied, setKeyCopied] = useState(false);
   const handleEyeClick = () => {
     if (showEncryptionKey) {
@@ -388,7 +389,7 @@ export function SecuritySettings() {
                 </p>
                 <div className="flex items-center gap-2">
                   <code className="text-xs bg-background p-2 rounded flex-1 overflow-x-auto font-mono">
-                    {showEncryptionKey ? user.aesKeyEncrypted : maskedKey}
+                    {showEncryptionKey ? shortenFileName(user.aesKeyEncrypted) : maskedKey}
                   </code>
                   {showEncryptionKey && (
                     <Button
