@@ -42,12 +42,20 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
 
     const droppedFiles = Array.from(e.dataTransfer.files);
     if (droppedFiles.length > 0) {
+      if (droppedFiles[0].size > 5 * 1024 * 1024 * 1024) {
+        toast.error("File size exceeds 5GB");
+        return;
+      }
       setFile(droppedFiles[0]); // Only take the first file
     }
   }, []);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
+      if (e.target.files[0].size > 5 * 1024 * 1024 * 1024) {
+        toast.error("File size exceeds 5GB");
+        return;
+      }
       setFile(e.target.files[0]); // Only take the first file
       e.target.value = "";
     }

@@ -39,6 +39,7 @@ export function ConfirmDeleteDialog({
       }
       queryClient.invalidateQueries({ queryKey: ["folder-contents"] });
       queryClient.invalidateQueries({ queryKey: ["move-destinations"] });
+      queryClient.invalidateQueries({ queryKey: ["quota-report"] });
       toast.success("File deleted successfully");
       setOpen(false);
     } catch (error: any) {
