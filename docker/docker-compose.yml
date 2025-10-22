@@ -1,0 +1,18 @@
+services:
+  ghost-drive-fe:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: ghost-drive:latest
+    container_name: ghost-drive-frontend
+    ports:
+      - "3000:80"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - ghost-drive-network
+
+networks:
+  ghost-drive-network:
+    driver: bridge
