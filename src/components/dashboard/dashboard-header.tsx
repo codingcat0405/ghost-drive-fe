@@ -8,8 +8,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Upload, User, Settings, LogOut, Bell } from "lucide-react";
-import { useNavigate, useSearchParams } from "react-router";
+import { Search, Upload, User, Settings, LogOut, Bell, Lock } from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { ACCESS_TOKEN_KEY } from "@/constants";
 import useUserStore from "@/store/user";
 import { toast } from "sonner";
@@ -84,6 +84,14 @@ export function DashboardHeader() {
             <Bell className="h-5 w-5" />
             <span className="absolute top-1 right-1 h-2 w-2 bg-primary rounded-full" />
           </Button>
+
+          <Link to="/vault">
+            <Button variant="outline" size="sm" className="gap-2 bg-transparent">
+              <Lock className="h-4 w-4" />
+              Vault
+            </Button>
+          </Link>
+          
           <UploadDialog>
             <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
               <Upload className="h-4 w-4 mr-2" />

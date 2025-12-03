@@ -2,6 +2,7 @@ import { createBrowserRouter } from "react-router";
 import { HomePage, LoginPage, RegisterPage } from "./pages";
 import ProtectedPageLayout from "./layout/ProtectedPageLayout";
 import SettingsPage from "./pages/SettingsPage";
+import VaultPage from "./pages/VaultPage";
 
 const router = createBrowserRouter([
   {
@@ -14,7 +15,11 @@ const router = createBrowserRouter([
       {
         path: "/settings",
         Component: SettingsPage,
-      }
+      },
+      {
+        path: "/vault",
+        Component: VaultPage,
+      },
     ],
   },
   {
