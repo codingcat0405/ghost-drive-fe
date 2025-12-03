@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Eye, EyeOff, Copy, Check } from "lucide-react";
+import { shortenFileName } from "@/utils/common";
 
 interface Secret {
   id: number;
@@ -85,7 +86,7 @@ export default function ViewSecretDialog({
             </label>
             <div className="flex items-center gap-2">
               <div className="flex-1 px-3 py-2 bg-background border border-border rounded text-foreground font-mono text-sm">
-                {showPassword ? secret.password : "••••••••••••"}
+                {showPassword ? shortenFileName(secret.password) : "••••••••••••"}
               </div>
               <Button
                 size="sm"
