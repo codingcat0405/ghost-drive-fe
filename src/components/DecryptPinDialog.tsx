@@ -20,7 +20,7 @@ import { Shield, XCircle, Lock } from "lucide-react";
 const DecryptPinDialog: React.FC<{
   open: boolean;
   setOpen: (open: boolean) => void;
-  onSuccess: () => void;
+  onSuccess: (aesKeyPlain: string) => void;
 }> = ({ open, setOpen, onSuccess }) => {
   const { user, setUser } = useUserStore();
   const [pin, setPin] = useState("");
@@ -48,7 +48,7 @@ const DecryptPinDialog: React.FC<{
       setOpen(false);
       setPin("");
       toast.success("PIN verified successfully");
-      onSuccess();
+      onSuccess(aesKeyPlain);
     } catch (error: any) {
       console.error(error);
       setError("Invalid PIN. Please try again.");

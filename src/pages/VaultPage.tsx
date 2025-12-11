@@ -273,17 +273,18 @@ export default function VaultPage() {
       <DecryptPinDialog
         open={pinDialogOpen}
         setOpen={setPinDialogOpen}
-        onSuccess={async () => {
+        onSuccess={async (aesKeyPlain) => {
           if (actionType === "create") {
             setCreateDialogOpen(true);
           } else if (actionType === "view") {
             try {
-              if (!user.aesKeyPlain || !selectedSecret?.password) {
+            
+              if (!selectedSecret?.password) {
                 return;
               }
               const decryptedPassword = await cryptoUtils.decryptText(
                 selectedSecret.password,
-                user.aesKeyPlain
+                aesKeyPlain
               );
               setSelectedSecret({
                 ...selectedSecret,
