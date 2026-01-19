@@ -505,7 +505,61 @@ const decryptAndDownload = async (
     return await decryptAndDownloadLarge(objectKey, aesKey, originalFileSize, onProgress);
   }
 };
+// ============= TEXT ENCRYPT & DECRYPT =============
 
+const encryptText = async (text: string, aesKey: string): Promise<string> => {
+  const keyBuffer = base64ToArrayBuffer(aesKey);
+  const key = await window.crypto.subtle.importKey(
+    'raw',
+    keyBuffer,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt']
+  );
+
+  const iv = window.crypto.getRandomValues(new Uint8Array(12)); // Generate random IV
+  const textBuffer = stringToArrayBuffer(text);
+
+  const encrypted = await window.crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    textBuffer
+  );
+
+  // Prepend IV to encrypted data (like you do in file encryption)
+  const combined = new Uint8Array(iv.length + encrypted.byteLength);
+  combined.set(iv);
+  combined.set(new Uint8Array(encrypted), iv.length);
+
+  return arrayBufferToBase64(combined.buffer);
+};
+
+const decryptText = async (encryptedText: string, aesKey: string): Promise<string> => {
+  const keyBuffer = base64ToArrayBuffer(aesKey);
+  const key = await window.crypto.subtle.importKey(
+    'raw',
+    keyBuffer,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['decrypt']
+  );
+
+  const encryptedBuffer = base64ToArrayBuffer(encryptedText);
+  const encryptedArray = new Uint8Array(encryptedBuffer);
+
+  const iv = encryptedArray.slice(0, 12);
+  const encrypted = encryptedArray.slice(12);
+
+  const decrypted = await window.crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    encrypted
+  );
+
+  // Convert ArrayBuffer back to string (not base64!)
+  const decoder = new TextDecoder();
+  return decoder.decode(decrypted);
+};
 // ============= EXPORTS =============
 
 const cryptoUtils = {
@@ -513,7 +567,9 @@ const cryptoUtils = {
   encryptFileEncryptionKey,
   decryptFileEncryptionKey,
   encryptAndUpload,
-  decryptAndDownload
+  decryptAndDownload,
+  encryptText,
+  decryptText
 };
 
 export default cryptoUtils;

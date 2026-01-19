@@ -259,6 +259,62 @@ const ghostDriveApi = {
     }> => {
       return axiosClient.get("/users/2fa/status");
     },
+  },
+  vault: {
+    create: async (data: {
+      title: string;
+      username?: string;
+      password: string;
+      category: number;
+    }) => {
+      return await axiosClient.post("/vaults", data);
+    },
+    list: async (params: {
+      q?: string;
+      category?: number;
+      page?: number;
+      limit?: number;
+    }): Promise<{
+      contents: {
+        id: number;
+        title: string;
+        userId: number;
+        username?: string;
+        category: number;
+        password: string;
+        createdAt: string;
+        updatedAt: string;
+      }[]
+      currentPage: number;
+      perPage: number;
+      totalPage: number;
+      totalElements: number;
+    }> => {
+      return await axiosClient.get("/vaults", { params });
+    },
+    update: async (id: number, data: {
+      title?: string;
+      username?: string;
+      category?: number;
+      password?: string;
+    }) => {
+      return await axiosClient.put(`/vaults/${id}`, data);
+    },
+    delete: async (id: number) => {
+      return await axiosClient.delete(`/vaults/${id}`);
+    },
+    detail: async (id: number): Promise<{
+      id: number;
+      title: string;
+      userId: number;
+      username?: string;
+      category: number;
+      password: string;
+      createdAt: string;
+      updatedAt: string;
+    }> => {
+      return await axiosClient.get(`/vaults/${id}`);
+    },
   }
 };
 
