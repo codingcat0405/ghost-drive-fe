@@ -2,6 +2,15 @@ import { useMemo, useState } from "react";
 import { Lock, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "@/components/ui/pagination";
 import VaultHeader from "@/components/vault/vault-header";
 import VaultGrid from "@/components/vault/vault-grid";
 import CreateSecretDialog from "@/components/vault/create-secret-dialog";
@@ -46,6 +55,7 @@ export default function VaultPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery] = useDebounce(searchQuery, 1000);
+  const [currentPage, setCurrentPage] = useState(1);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -64,10 +74,10 @@ export default function VaultPage() {
     },
     refetch: refetchSecrets,
   } = useQuery({
-    queryKey: ["vault.list", debouncedSearchQuery],
+    queryKey: ["vault.list", debouncedSearchQuery, currentPage],
     queryFn: async ({ queryKey }) => {
       const data = await ghostDriveApi.vault.list({
-        page: 1,
+        page: queryKey[2] as number,
         limit: 10,
         q: queryKey[1] as string,
       });
@@ -216,7 +226,10 @@ export default function VaultPage() {
             <Input
               placeholder="Search secrets by title or username..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
               className="pl-10 bg-card border-border text-foreground"
             />
           </div>
@@ -253,11 +266,68 @@ export default function VaultPage() {
               )}
             </div>
           ) : (
-            <VaultGrid
-              secrets={secrets}
-              onView={handleViewSecret}
-              onDelete={handleDeleteSecret}
-            />
+            <>
+              <VaultGrid
+                secrets={secrets}
+                onView={handleViewSecret}
+                onDelete={handleDeleteSecret}
+              />
+              {secretData.totalPage > 1 && (
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        aria-disabled={currentPage === 1}
+                        className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+
+                    {Array.from({ length: secretData.totalPage }, (_, i) => i + 1)
+                      .filter((page) => {
+                        // Show first, last, current, and neighbors; ellipsis otherwise
+                        return (
+                          page === 1 ||
+                          page === secretData.totalPage ||
+                          Math.abs(page - currentPage) <= 1
+                        );
+                      })
+                      .reduce<(number | "ellipsis")[]>((acc, page, idx, arr) => {
+                        if (idx > 0 && (page as number) - (arr[idx - 1] as number) > 1) {
+                          acc.push("ellipsis");
+                        }
+                        acc.push(page);
+                        return acc;
+                      }, [])
+                      .map((item, idx) =>
+                        item === "ellipsis" ? (
+                          <PaginationItem key={`ellipsis-${idx}`}>
+                            <PaginationEllipsis />
+                          </PaginationItem>
+                        ) : (
+                          <PaginationItem key={item}>
+                            <PaginationLink
+                              isActive={currentPage === item}
+                              onClick={() => setCurrentPage(item as number)}
+                              className="cursor-pointer"
+                            >
+                              {item}
+                            </PaginationLink>
+                          </PaginationItem>
+                        )
+                      )}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => setCurrentPage((p) => Math.min(secretData.totalPage, p + 1))}
+                        aria-disabled={currentPage === secretData.totalPage}
+                        className={currentPage === secretData.totalPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              )}
+            </>
           )}
         </div>
       </main>
