@@ -7,52 +7,11 @@ import {
 import { AlertCircle, Download, Loader2, Music } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { shortenFileName } from "@/utils/common";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import useUserStore from "@/store/user";
 import { toast } from "sonner";
-import cryptoUtils from "@/utils/crypto";
-
-// Helper function to check if file can be previewed
-function canPreview(file: {
-  id: number;
-  name: string;
-  type: "file" | "folder";
-  size: number;
-  mimeType: string;
-}): { canPreview: boolean; reason?: string } {
-  if (file.mimeType.includes("image")) {
-    return { canPreview: true };
-  }
-
-  if (file.mimeType.includes("audio")) {
-    const sizeInBytes = file.size / 1024 / 1024; // convert to MB
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (sizeInBytes > maxSize) {
-      return {
-        canPreview: false,
-        reason: `Audio file is too large (${file.size}). Maximum size for preview is 10MB.`,
-      };
-    }
-    return { canPreview: true };
-  }
-
-  if (file.mimeType.includes("video")) {
-    const sizeInBytes = file.size / 1024 / 1024; // convert to MB
-    const maxSize = 100 * 1024 * 1024; // 100MB
-    if (sizeInBytes > maxSize) {
-      return {
-        canPreview: false,
-        reason: `Video file is too large (${file.size}). Maximum size for preview is 100MB.`,
-      };
-    }
-    return { canPreview: true };
-  }
-
-  return {
-    canPreview: false,
-    reason: "Preview not supported for this file type.",
-  };
-}
+import { downloadDecryptedFile } from "@/utils/download-decrypted-file";
+import { getPreviewKind, useDecryptedFilePreview } from "@/hooks/use-decrypted-file-preview";
 
 export function PreviewFileDialog({
   open,
@@ -70,75 +29,49 @@ export function PreviewFileDialog({
     objectKey: string;
   };
 }) {
-  if (!file) return null;
-  const [decrypting, setDecrypting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const { user } = useUserStore();
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const previewInfo = canPreview(file);
+  const [downloading, setDownloading] = useState(false);
+  const [preview, setPreview] = useDecryptedFilePreview(open, file, user.aesKeyPlain);
+
+  const previewUrl = preview.status === "ready" ? preview.url : null;
+  const decrypting = preview.status === "loading";
+  const error = preview.status === "error" ? preview.reason : null;
 
   const onDownload = async () => {
-    let downloadUrl = previewUrl;
-    if (!downloadUrl) {
-      downloadUrl = await decryptFile();
-    }
-    if (!downloadUrl) {
-      toast.error("Failed to decrypt file");
-      return;
-    }
-    //download file from the preview url
-    const response = await fetch(downloadUrl ?? "");
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = file.name;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("File downloaded successfully");
-    setOpen(false);
-  };
-  const decryptFile = async () => {
-    try {
-      setDecrypting(true);
-      if (!user.aesKeyPlain) {
-        throw new Error("Pin not verified");
-      }
-      const blob = await cryptoUtils.decryptAndDownload(
-        file.objectKey,
-        user.aesKeyPlain,
-        file.size
-      );
-      const url = URL.createObjectURL(blob);
-
-      return url;
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.message);
-      setError(error.message);
-      return null;
-    } finally {
-      setDecrypting(false);
-    }
-  };
-  useEffect(() => {
     if (!user.aesKeyPlain) {
+      toast.error("Pin not verified");
       return;
     }
-    if (!open) {
-      setPreviewUrl(null);
-      setDecrypting(false);
-      return;
+    try {
+      setDownloading(true);
+      const mode = await downloadDecryptedFile(file, user.aesKeyPlain, previewUrl, (message) =>
+        toast.error(`Download failed: ${message}`)
+      );
+      toast.success(
+        mode === "streaming"
+          ? "Download started — decrypting while downloading"
+          : "File downloaded successfully"
+      );
+      setOpen(false);
+    } catch (err: unknown) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Failed to download file");
+    } finally {
+      setDownloading(false);
     }
-    if (canPreview(file).canPreview) {
-      decryptFile().then((url) => {
-        if (url) {
-          setPreviewUrl(url);
-        }
-      });
-      return;
-    }
-  }, [open, user.aesKeyPlain]);
+  };
+
+  // Media element failed (network/decrypt error mid-stream or codec unsupported on this device)
+  const onMediaError = () =>
+    setPreview({
+      status: "error",
+      reason:
+        "Cannot play this file in the browser (unsupported format/codec or decryption failed). Try downloading it.",
+    });
+
+  if (!file) return null;
+  const sizeInMb = (file.size / 1024 / 1024).toFixed(2);
+  const kind = getPreviewKind(file.mimeType);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -149,13 +82,6 @@ export function PreviewFileDialog({
           </DialogTitle>
         </DialogHeader>
 
-        {error && (
-          <div className="flex items-center justify-center">
-            <AlertCircle className="h-4 w-4 text-destructive" />
-            <span>{error}</span>
-          </div>
-        )}
-
         {decrypting ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -163,19 +89,19 @@ export function PreviewFileDialog({
           </div>
         ) : (
           <div className="space-y-4">
-            {previewInfo.canPreview && !error ? (
+            {previewUrl ? (
               <>
-                {file.mimeType.includes("image") && (
+                {kind === "image" && (
                   <div className="flex items-center justify-center bg-muted/50 rounded-lg p-4 min-h-[300px]">
                     <img
-                      src={previewUrl ?? ""}
+                      src={previewUrl}
                       alt={file.name}
                       className="max-h-[400px] max-w-full rounded-lg object-contain"
                     />
                   </div>
                 )}
 
-                {file.mimeType.includes("audio") && (
+                {kind === "audio" && (
                   <div className="flex flex-col items-center justify-center bg-muted/50 rounded-lg p-8 space-y-4">
                     <div className="p-4 rounded-full bg-primary/10">
                       <Music className="h-12 w-12 text-primary" />
@@ -183,31 +109,36 @@ export function PreviewFileDialog({
                     <div className="text-center">
                       <h3 className="font-semibold">{file.name}</h3>
                       <p className="text-sm text-muted-foreground">
-                        {file.size}
+                        {sizeInMb} MB
                       </p>
                     </div>
                     <audio
                       controls
+                      preload="metadata"
                       className="w-full max-w-sm"
-                      src={previewUrl ?? ""}
+                      src={previewUrl}
+                      onError={onMediaError}
                     />
                   </div>
                 )}
 
-                {file.mimeType.includes("video") && (
+                {kind === "video" && (
                   <div className="flex items-center justify-center bg-muted/50 rounded-lg p-4 min-h-[300px]">
                     <video
                       controls
+                      playsInline
+                      preload="metadata"
                       className="max-h-[400px] max-w-full rounded-lg"
-                      src={previewUrl ?? ""}
+                      src={previewUrl}
+                      onError={onMediaError}
                     />
                   </div>
                 )}
 
                 <div className="flex gap-2 pt-4">
-                  <Button onClick={onDownload} className="flex-1">
+                  <Button onClick={onDownload} className="flex-1" disabled={downloading}>
                     <Download className="mr-2 h-4 w-4" />
-                    Download
+                    {downloading ? "Preparing..." : "Download"}
                   </Button>
                   <Button
                     variant="outline"
@@ -224,22 +155,26 @@ export function PreviewFileDialog({
                   <AlertCircle className="h-12 w-12 text-destructive" />
                 </div>
                 <div className="text-center space-y-2">
-                  <h3 className="font-semibold">Preview Not Available</h3>
+                  <h3 className="font-semibold">
+                    {error ? "Preview Failed" : "Preview Not Available"}
+                  </h3>
                   <p className="text-sm text-muted-foreground max-w-sm">
-                    {previewInfo.reason}
+                    {error ??
+                      (preview.status === "unsupported"
+                        ? preview.reason
+                        : "Verify your PIN to preview this file.")}
                   </p>
                 </div>
 
                 <div className="flex gap-2 pt-4 w-full">
-                  <Button onClick={onDownload} className="flex-1" disabled={decrypting}>
+                  <Button onClick={onDownload} className="flex-1" disabled={downloading}>
                     <Download className="mr-2 h-4 w-4" />
-                    {decrypting ? "Decrypting..." : "Download File"}
+                    {downloading ? "Preparing..." : "Download File"}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => setOpen(false)}
                     className="flex-1 bg-transparent"
-                    disabled={decrypting}
                   >
                     Close
                   </Button>
@@ -252,10 +187,9 @@ export function PreviewFileDialog({
                 <span className="font-semibold">File:</span>{" "}
                 {shortenFileName(file.name)}
               </p>
-              {file.size && (
+              {file.size > 0 && (
                 <p>
-                  <span className="font-semibold">Size:</span>{" "}
-                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                  <span className="font-semibold">Size:</span> {sizeInMb} MB
                 </p>
               )}
             </div>

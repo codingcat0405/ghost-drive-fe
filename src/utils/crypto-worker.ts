@@ -1,7 +1,8 @@
-// crypto-worker.ts - Web Worker for encryption
+// crypto-worker.ts - Web Worker that encrypts/decrypts single AES-GCM chunks off the main thread.
+// Message in:  { taskId, command: 'encrypt' | 'decrypt', chunkData: ArrayBuffer, aesKeyBase64 }
+// Message out: { taskId, success, data?: ArrayBuffer, error?: string }
 
-// Import crypto utilities (inline or shared module)
-// Removed unused function
+import { IV_SIZE, TAG_SIZE } from './encrypted-chunk-layout';
 
 const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
   const binaryString = atob(base64);
@@ -12,97 +13,55 @@ const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
   return bytes.buffer;
 };
 
-// Listen for messages from main thread
-self.onmessage = async (event) => {
-  const { command, chunkData, aesKeyBase64, chunkIndex } = event.data;
-
-  if (command === 'encrypt') {
-    try {
-      // Convert base64 key to CryptoKey
-      const keyBuffer = base64ToArrayBuffer(aesKeyBase64);
-      const key = await crypto.subtle.importKey(
-        'raw',
-        keyBuffer,
-        { name: 'AES-GCM', length: 256 },
-        false,
-        ['encrypt']
-      );
-
-      // Generate random IV for this chunk
-      const iv = crypto.getRandomValues(new Uint8Array(12));
-
-      // Encrypt chunk
-      const encryptedChunk = await crypto.subtle.encrypt(
-        { name: 'AES-GCM', iv: iv },
-        key,
-        chunkData
-      );
-
-      // Combine IV and encrypted data
-      const combined = new Uint8Array(iv.length + encryptedChunk.byteLength);
-      combined.set(iv);
-      combined.set(new Uint8Array(encryptedChunk), iv.length);
-
-      // Send back encrypted chunk with index
-      self.postMessage({
-        success: true,
-        chunkIndex: chunkIndex,
-        encryptedData: combined.buffer
-      }, { transfer: [combined.buffer] }); // Transfer ownership to avoid copy
-
-    } catch (error) {
-      self.postMessage({
-        success: false,
-        chunkIndex: chunkIndex,
-        error: error instanceof Error ? error.message : String(error)
-      });
-    }
+// Cache the imported CryptoKey: importKey once per worker instead of once per chunk
+let cachedKey: { base64: string; key: Promise<CryptoKey> } | null = null;
+const getKey = (aesKeyBase64: string): Promise<CryptoKey> => {
+  if (cachedKey?.base64 !== aesKeyBase64) {
+    cachedKey = {
+      base64: aesKeyBase64,
+      key: crypto.subtle.importKey('raw', base64ToArrayBuffer(aesKeyBase64), { name: 'AES-GCM' }, false, [
+        'encrypt',
+        'decrypt',
+      ]),
+    };
   }
+  return cachedKey.key;
+};
 
-  if (command === 'decrypt') {
-    try {
-      const keyBuffer = base64ToArrayBuffer(aesKeyBase64);
-      const key = await crypto.subtle.importKey(
-        'raw',
-        keyBuffer,
-        { name: 'AES-GCM', length: 256 },
-        false,
-        ['decrypt']
-      );
+const encryptChunk = async (key: CryptoKey, chunkData: ArrayBuffer): Promise<ArrayBuffer> => {
+  const iv = crypto.getRandomValues(new Uint8Array(IV_SIZE));
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, chunkData);
+  const combined = new Uint8Array(IV_SIZE + encrypted.byteLength);
+  combined.set(iv);
+  combined.set(new Uint8Array(encrypted), IV_SIZE);
+  return combined.buffer;
+};
 
-      const encryptedArray = new Uint8Array(chunkData);
+const decryptChunk = async (key: CryptoKey, chunkData: ArrayBuffer): Promise<ArrayBuffer> => {
+  if (chunkData.byteLength < IV_SIZE + TAG_SIZE) {
+    throw new Error(`Encrypted chunk too small (${chunkData.byteLength} bytes)`);
+  }
+  // Views (no copies) over the transferred buffer
+  const iv = new Uint8Array(chunkData, 0, IV_SIZE);
+  const encrypted = new Uint8Array(chunkData, IV_SIZE);
+  return crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encrypted);
+};
 
-      // Check if chunk is too small
-      if (encryptedArray.length < 12) {
-        throw new Error(`Chunk ${chunkIndex} too small (${encryptedArray.length} bytes) - need at least 12 bytes for IV`);
-      }
+self.onmessage = async (event: MessageEvent) => {
+  const { taskId, command, chunkData, aesKeyBase64 } = event.data;
+  try {
+    const key = await getKey(aesKeyBase64);
+    let data: ArrayBuffer;
+    if (command === 'encrypt') data = await encryptChunk(key, chunkData);
+    else if (command === 'decrypt') data = await decryptChunk(key, chunkData);
+    else throw new Error(`Unknown command: ${command}`);
 
-      const iv = encryptedArray.slice(0, 12);
-      const encryptedData = encryptedArray.slice(12);
-
-      // Check if encrypted data is too small
-      if (encryptedData.length < 16) {
-        throw new Error(`Chunk ${chunkIndex} encrypted data too small (${encryptedData.length} bytes) - need at least 16 bytes for GCM tag`);
-      }
-
-      const decryptedChunk = await crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv: iv },
-        key,
-        encryptedData
-      );
-
-      self.postMessage({
-        success: true,
-        chunkIndex: chunkIndex,
-        decryptedData: decryptedChunk
-      }, { transfer: [decryptedChunk] }); // Transfer ownership
-
-    } catch (error) {
-      self.postMessage({
-        success: false,
-        chunkIndex: chunkIndex,
-        error: error instanceof Error ? error.message : String(error)
-      });
-    }
+    self.postMessage({ taskId, success: true, data }, { transfer: [data] });
+  } catch (error) {
+    self.postMessage({
+      taskId,
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 };

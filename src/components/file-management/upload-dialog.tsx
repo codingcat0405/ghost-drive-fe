@@ -81,48 +81,52 @@ export function UploadDialog({ children }: { children: React.ReactNode }) {
     const objectKey = sanitizeFileName(file.name);
     console.log("file", file);
 
+    // Entry must exist before upload (BE checks quota/ownership against it)
+    let createdFileId: number | undefined;
     try {
       setUploading(true);
       const currentFolderId = searchParams.get("folder")
         ? parseInt(searchParams.get("folder")!)
         : undefined;
-      await ghostDriveApi.file.createFileEntry({
+      const entry = (await ghostDriveApi.file.createFileEntry({
         name: file.name,
         objectKey,
         size: file.size,
-        mimeType: file.type ?? "application/octet-stream",
+        mimeType: file.type || "application/octet-stream",
         folderId: currentFolderId,
-      });
+      })) as unknown as { id?: number };
+      createdFileId = entry?.id;
+
       await cryptoUtils.encryptAndUpload(
         file,
         user.aesKeyPlain,
         objectKey,
         (progress) => {
-          console.log(progress);
-
           setProgress({
             percent: progress.percentage,
             stage: progress.stage,
           });
-          if (progress.percentage === 100) {
-            setUploading(false);
-            setFile(null);
-            toast.success(`${file.name} uploaded successfully`);
-            setProgress({
-              percent: 0,
-              stage: "",
-            });
-            // Invalidate and refetch the files query to update the file grid
-            queryClient.invalidateQueries({ queryKey: ["folder-contents"] });
-            queryClient.invalidateQueries({ queryKey: ["quota-report"] });
-            setOpen(false);
-          }
         }
       );
+
+      // Success only after the whole upload (incl. multipart completion) resolved
+      toast.success(`${file.name} uploaded successfully`);
+      setFile(null);
+      setOpen(false);
     } catch (error: any) {
       console.error("Upload failed:", error);
       toast.error(`Upload failed: ${error.message}`);
+      // Remove the orphan DB entry so it doesn't show up as a broken file / eat quota
+      if (createdFileId) {
+        await ghostDriveApi.file.deleteFileEntry(createdFileId).catch((cleanupError) =>
+          console.error("Failed to clean up file entry:", cleanupError)
+        );
+      }
+    } finally {
       setUploading(false);
+      setProgress({ percent: 0, stage: "" });
+      queryClient.invalidateQueries({ queryKey: ["folder-contents"] });
+      queryClient.invalidateQueries({ queryKey: ["quota-report"] });
     }
   };
 
