@@ -54,6 +54,7 @@ const blob = await cryptoUtils.decryptAndDownload(
   objectKey, 
   aesKeyBase64, 
   originalFileSize,
+  mimeType,
   (progress) => console.log('Download progress:', progress)
 );
 
@@ -141,6 +142,7 @@ const downloadFile = async (objectKey: string, fileKey: string, originalFileSize
     objectKey, 
     fileKey, 
     originalFileSize,
+    mimeType,
     (progress) => {
       console.log(`Download progress: ${progress.percentage}%`);
       // Memory usage stays constant for large files!
@@ -336,7 +338,12 @@ Smart upload function that automatically chooses the best strategy:
 - **Large files (≥10MB)**: Chunked streaming upload
 - **Memory efficient**: Only uses 25MB chunks for large files
 
-### `decryptAndDownload(objectKey: string, aesKeyBase64: string, originalFileSize: number, onProgress?: (progress: DownloadProgress) => void): Promise<Blob>`
+### `decryptAndDownload(objectKey: string, aesKeyBase64: string, originalFileSize: number, mimeType?: string, onProgress?: (progress: DownloadProgress) => void): Promise<Blob>`
+
+> Holds the whole file in memory — used as a fallback only. For media preview and downloads the app
+> streams through the decrypt Service Worker (`public/decrypt-stream-sw.js`,
+> `decrypt-stream-service-worker-client.ts`): Range requests are mapped to the fixed 25MB encrypted
+> chunks (`encrypted-chunk-layout.ts`) and decrypted on the fly with bounded memory.
 
 Smart download function that automatically chooses the best strategy:
 
@@ -433,3 +440,11 @@ Our implementation achieves exceptional memory efficiency:
 6. **Memory Management**: Large files are processed in 25MB chunks to prevent browser crashes and maintain optimal performance.
 
 7. **Streaming**: Range-based downloads ensure large files don't consume excessive memory during download.
+
+
+## Streaming decryption (Service Worker)
+
+- `ensureDecryptStreamServiceWorker()` — registers `/decrypt-stream-sw.js` (scope `/`), resolves `true` when it controls the page (requires HTTPS/localhost; hard reload → `false` → Blob fallback).
+- `registerDecryptStream(config, { download?, onError? })` — returns `{ url, release }`; `url` is `/__ghost-stream/<uuid>/<name>` (Range/206 supported) usable as `<video src>`; with `download: true` it is a one-shot attachment URL released automatically when the download ends.
+- `clearAllDecryptStreams()` — wipes all sessions/keys from page + SW memory (called automatically when `aesKeyPlain` is cleared, e.g. logout).
+- Chunked upload/download run 2 (mobile) / 4 (desktop) chunks in parallel with retry + backoff and a screen wake lock.

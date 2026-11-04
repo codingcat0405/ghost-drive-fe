@@ -4,6 +4,15 @@
  */
 
 import ghostDriveApi from '@/apis/ghost-drive-api';
+import { fetchArrayBufferWithRetry, fetchWithRetry } from './async-retry-and-concurrency';
+import {
+  decryptAndDownloadLarge,
+  encryptAndUploadLarge,
+  type DownloadProgress,
+  type UploadProgress,
+} from './chunked-encrypted-file-transfer';
+import { CHUNK_SIZE, IV_SIZE } from './encrypted-chunk-layout';
+import { acquireScreenWakeLock } from './screen-wake-lock';
 
 // ============= UTILITY FUNCTIONS =============
 
@@ -37,28 +46,8 @@ const hashPin = async (pin: string): Promise<ArrayBuffer> => {
 
 // ============= CONSTANTS =============
 
-const CHUNK_SIZE = 25 * 1024 * 1024; // 25MB chunks - optimal balance of memory efficiency and performance
-const IV_SIZE = 12; // AES-GCM IV size
-const TAG_SIZE = 16; // AES-GCM authentication tag size
-const ENCRYPTION_OVERHEAD = IV_SIZE + TAG_SIZE; // 28 bytes per chunk
-
-const MULTIPART_THRESHOLD = 25 * 1024 * 1024; // 25MB threshold
-
-// ============= PROGRESS INTERFACES =============
-
-interface UploadProgress {
-  stage: 'encrypting' | 'uploading';
-  chunkIndex?: number;
-  totalChunks?: number;
-  percentage: number;
-}
-
-interface DownloadProgress {
-  stage: 'downloading' | 'decrypting';
-  chunkIndex?: number;
-  totalChunks?: number;
-  percentage: number;
-}
+// Files below one chunk are uploaded with a single PUT (same on-disk layout as 1 chunk)
+const MULTIPART_THRESHOLD = CHUNK_SIZE;
 
 // ============= CORE FUNCTIONS =============
 
@@ -138,16 +127,6 @@ const decryptFileEncryptionKey = async (encryptedKey: string, pin: string): Prom
   return arrayBufferToBase64(decryptedKey);
 };
 
-// ============= WORKER MANAGEMENT =============
-
-const createWorkerPool = (size: number): Worker[] => {
-  const workers: Worker[] = [];
-  for (let i = 0; i < size; i++) {
-    workers.push(new Worker(new URL('./crypto-worker.ts', import.meta.url)));
-  }
-  return workers;
-};
-
 // ============= SMALL FILE ENCRYPT & UPLOAD =============
 
 const encryptAndUploadSmall = async (
@@ -158,24 +137,16 @@ const encryptAndUploadSmall = async (
 ): Promise<void> => {
   onProgress?.({ stage: 'encrypting', percentage: 0 });
 
-  // Encrypt entire file
-  const keyBuffer = base64ToArrayBuffer(aesKey);
   const key = await window.crypto.subtle.importKey(
     'raw',
-    keyBuffer,
+    base64ToArrayBuffer(aesKey),
     { name: 'AES-GCM', length: 256 },
     false,
     ['encrypt']
   );
 
-  const fileBuffer = await file.arrayBuffer();
-  const iv = window.crypto.getRandomValues(new Uint8Array(12));
-
-  const encryptedFile = await window.crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    fileBuffer
-  );
+  const iv = window.crypto.getRandomValues(new Uint8Array(IV_SIZE));
+  const encryptedFile = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, await file.arrayBuffer());
 
   const combined = new Uint8Array(iv.length + encryptedFile.byteLength);
   combined.set(iv);
@@ -183,127 +154,21 @@ const encryptAndUploadSmall = async (
 
   onProgress?.({ stage: 'uploading', percentage: 50 });
 
-  // Get presigned URL and upload
   const { uploadUrl } = await ghostDriveApi.upload.getUploadUrl(objectKey);
-
-  await fetch(uploadUrl, {
-    method: 'PUT',
-    body: combined,
-    headers: { 'Content-Type': 'application/octet-stream' }
-  });
+  await fetchWithRetry(
+    uploadUrl,
+    { method: 'PUT', body: combined, headers: { 'Content-Type': 'application/octet-stream' } },
+    'Upload'
+  );
 
   onProgress?.({ stage: 'uploading', percentage: 100 });
-};
-
-// ============= LARGE FILE ENCRYPT & UPLOAD =============
-
-const encryptAndUploadLarge = async (
-  file: File,
-  aesKey: string,
-  objectKey: string,
-  onProgress?: (progress: UploadProgress) => void
-): Promise<void> => {
-  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-  const workerCount = Math.min(navigator.hardwareConcurrency || 4, 8);
-  const workers = createWorkerPool(workerCount);
-
-  try {
-    // Initialize multipart upload
-    const { uploadId, objectName, partUrls } = await ghostDriveApi.upload.getUploadMultipartUrl(
-      objectKey,
-      totalChunks
-    );
-
-    const encryptedParts: Array<{ PartNumber: number; ETag: string }> = [];
-    let currentWorkerIndex = 0;
-    let completedChunks = 0;
-
-    // Process chunks sequentially to minimize memory usage
-    const processChunk = (chunkIndex: number): Promise<void> => {
-      return new Promise((resolve, reject) => {
-        const start = chunkIndex * CHUNK_SIZE;
-        const end = Math.min(start + CHUNK_SIZE, file.size);
-        const chunk = file.slice(start, end);
-
-        chunk.arrayBuffer().then(chunkData => {
-          const worker = workers[currentWorkerIndex % workers.length];
-          currentWorkerIndex++;
-
-          worker.onmessage = async (event) => {
-            const { success, encryptedData, error } = event.data;
-
-            if (!success) {
-              reject(new Error(error));
-              return;
-            }
-
-            try {
-              // Upload encrypted chunk
-              const partUrl = partUrls[chunkIndex].url;
-              const uploadResponse = await fetch(partUrl, {
-                method: 'PUT',
-                body: encryptedData,
-                headers: { 'Content-Type': 'application/octet-stream' }
-              });
-
-              if (!uploadResponse.ok) {
-                throw new Error(`Upload failed for chunk ${chunkIndex}`);
-              }
-
-              const etag = uploadResponse.headers.get('ETag')?.replace(/"/g, '') || '';
-
-              encryptedParts.push({
-                PartNumber: chunkIndex + 1,
-                ETag: etag
-              });
-
-              completedChunks++;
-
-              onProgress?.({
-                stage: 'uploading',
-                chunkIndex: completedChunks,
-                totalChunks,
-                percentage: (completedChunks / totalChunks) * 100
-              });
-
-              resolve();
-            } catch (error) {
-              reject(error);
-            }
-          };
-
-          worker.postMessage({
-            command: 'encrypt',
-            chunkData,
-            aesKeyBase64: aesKey,
-            chunkIndex
-          }, [chunkData]);
-        }).catch(reject);
-      });
-    };
-
-    // Process chunks sequentially (one at a time) to minimize memory usage
-    for (let i = 0; i < totalChunks; i++) {
-      await processChunk(i);
-      // Force garbage collection hint
-      if (i % 2 === 0) {
-        await new Promise(resolve => setTimeout(resolve, 10));
-      }
-    }
-
-    // Complete multipart upload
-    encryptedParts.sort((a, b) => a.PartNumber - b.PartNumber);
-    await ghostDriveApi.upload.completeUploadMultipart(objectName, uploadId, encryptedParts);
-
-  } finally {
-    workers.forEach(w => w.terminate());
-  }
 };
 
 // ============= SMART ENCRYPT & UPLOAD =============
 
 /**
- * Smart encrypt and upload - automatically chooses strategy based on file size
+ * Smart encrypt and upload - automatically chooses strategy based on file size.
+ * Keeps the screen awake meanwhile (mobile tabs get frozen when the screen turns off).
  */
 const encryptAndUpload = async (
   file: File,
@@ -311,12 +176,15 @@ const encryptAndUpload = async (
   objectKey: string,
   onProgress?: (progress: UploadProgress) => void
 ): Promise<void> => {
-  if (file.size < MULTIPART_THRESHOLD) {
-    console.log('Using simple upload for small file');
-    await encryptAndUploadSmall(file, aesKey, objectKey, onProgress);
-  } else {
-    console.log('Using chunked upload for large file');
-    await encryptAndUploadLarge(file, aesKey, objectKey, onProgress);
+  const releaseWakeLock = await acquireScreenWakeLock();
+  try {
+    if (file.size < MULTIPART_THRESHOLD) {
+      await encryptAndUploadSmall(file, aesKey, objectKey, onProgress);
+    } else {
+      await encryptAndUploadLarge(file, aesKey, objectKey, onProgress);
+    }
+  } finally {
+    releaseWakeLock();
   }
 };
 
@@ -325,186 +193,60 @@ const encryptAndUpload = async (
 const decryptAndDownloadSmall = async (
   objectKey: string,
   aesKey: string,
+  mimeType: string,
   onProgress?: (progress: DownloadProgress) => void
 ): Promise<Blob> => {
-  try {
-    onProgress?.({ stage: 'downloading', percentage: 0 });
+  onProgress?.({ stage: 'downloading', percentage: 0 });
 
-    // Download encrypted file
-    const { downloadUrl } = await ghostDriveApi.upload.getDownloadUrl(objectKey);
-    console.log('Downloading from URL:', downloadUrl);
+  const { downloadUrl } = await ghostDriveApi.upload.getDownloadUrl(objectKey);
+  const encryptedData = await fetchArrayBufferWithRetry(downloadUrl, {}, 'Download');
 
-    const response = await fetch(downloadUrl);
-    if (!response.ok) {
-      throw new Error(`Download failed: ${response.status} ${response.statusText}`);
-    }
+  onProgress?.({ stage: 'decrypting', percentage: 50 });
 
-    const encryptedData = await response.arrayBuffer();
-    console.log('Downloaded encrypted data, size:', encryptedData.byteLength);
+  const key = await window.crypto.subtle.importKey(
+    'raw',
+    base64ToArrayBuffer(aesKey),
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['decrypt']
+  );
 
-    onProgress?.({ stage: 'decrypting', percentage: 50 });
+  // Views over the downloaded buffer — avoids copying
+  const iv = new Uint8Array(encryptedData, 0, IV_SIZE);
+  const encrypted = new Uint8Array(encryptedData, IV_SIZE);
+  const decrypted = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encrypted);
 
-    // Decrypt
-    const keyBuffer = base64ToArrayBuffer(aesKey);
-    const key = await window.crypto.subtle.importKey(
-      'raw',
-      keyBuffer,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['decrypt']
-    );
+  onProgress?.({ stage: 'decrypting', percentage: 100 });
 
-    const encryptedArray = new Uint8Array(encryptedData);
-    const iv = encryptedArray.slice(0, 12);
-    const encrypted = encryptedArray.slice(12);
-
-    console.log('Decrypting data, IV length:', iv.length, 'Encrypted length:', encrypted.length);
-
-    const decrypted = await window.crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
-      key,
-      encrypted
-    );
-
-    onProgress?.({ stage: 'decrypting', percentage: 100 });
-
-    return new Blob([decrypted]);
-  } catch (error) {
-    console.error('Download/decrypt error:', error);
-    throw error;
-  }
+  return new Blob([decrypted], { type: mimeType });
 };
 
-// ============= LARGE FILE DOWNLOAD & DECRYPT =============
-
-// ============= LARGE FILE DOWNLOAD & DECRYPT (FIXED) =============
-
-const decryptAndDownloadLarge = async (
-  objectKey: string,
-  aesKey: string,
-  originalFileSize: number, // IMPORTANT: This should be the ORIGINAL file size before encryption
-  onProgress?: (progress: DownloadProgress) => void
-): Promise<Blob> => {
-  // Calculate expected encrypted file size
-  const totalChunks = Math.ceil(originalFileSize / CHUNK_SIZE);
-
-  // Calculate encrypted chunk sizes
-  const encryptedChunkSizes: number[] = [];
-  for (let i = 0; i < totalChunks; i++) {
-    const start = i * CHUNK_SIZE;
-    const end = Math.min(start + CHUNK_SIZE, originalFileSize);
-    const originalChunkSize = end - start;
-    const encryptedChunkSize = originalChunkSize + ENCRYPTION_OVERHEAD;
-    encryptedChunkSizes.push(encryptedChunkSize);
-  }
-
-  const workerCount = Math.min(navigator.hardwareConcurrency || 4, 8);
-  const workers = createWorkerPool(workerCount);
-
-  try {
-    const { downloadUrl } = await ghostDriveApi.upload.getDownloadUrl(objectKey);
-
-    const decryptedChunks: Blob[] = [];
-    let currentWorkerIndex = 0;
-    let completedChunks = 0;
-
-    // Process chunk with Range-based download
-    const processChunk = (chunkIndex: number): Promise<void> => {
-      return new Promise((resolve, reject) => {
-        // Calculate start position in encrypted file
-        let encryptedStart = 0;
-        for (let i = 0; i < chunkIndex; i++) {
-          encryptedStart += encryptedChunkSizes[i];
-        }
-
-        const encryptedEnd = encryptedStart + encryptedChunkSizes[chunkIndex] - 1;
-
-        // Download only this chunk using Range header
-        fetch(downloadUrl, {
-          headers: { Range: `bytes=${encryptedStart}-${encryptedEnd}` }
-        }).then(response => {
-          if (!response.ok) {
-            throw new Error(`Range download failed for chunk ${chunkIndex}: ${response.status}`);
-          }
-          return response.arrayBuffer();
-        }).then(encryptedChunkData => {
-          console.log(`Downloaded chunk ${chunkIndex}, size: ${encryptedChunkData.byteLength} bytes`);
-
-          const worker = workers[currentWorkerIndex % workers.length];
-          currentWorkerIndex++;
-
-          worker.onmessage = (event) => {
-            const { success, decryptedData, error } = event.data;
-
-            if (!success) {
-              reject(new Error(`Decryption failed for chunk ${chunkIndex}: ${error}`));
-              return;
-            }
-
-            decryptedChunks[chunkIndex] = new Blob([decryptedData]);
-            completedChunks++;
-
-            onProgress?.({
-              stage: 'decrypting',
-              chunkIndex: completedChunks,
-              totalChunks,
-              percentage: (completedChunks / totalChunks) * 100
-            });
-
-            resolve();
-          };
-
-          worker.postMessage(
-            {
-              command: 'decrypt',
-              chunkData: encryptedChunkData,
-              aesKeyBase64: aesKey,
-              chunkIndex
-            },
-            [encryptedChunkData]
-          );
-        }).catch(reject);
-      });
-    };
-
-    // Process chunks sequentially to minimize memory usage
-    for (let i = 0; i < totalChunks; i++) {
-      await processChunk(i);
-      // Force garbage collection hint
-      if (i % 2 === 0) {
-        await new Promise(resolve => setTimeout(resolve, 10));
-      }
-    }
-    return new Blob(decryptedChunks);
-
-  } finally {
-    workers.forEach(w => w.terminate());
-  }
-};
-
-// ============= SMART DECRYPT & DOWNLOAD (UPDATED) =============
+// ============= SMART DECRYPT & DOWNLOAD =============
 
 /**
- * Smart decrypt and download - automatically chooses strategy
- * @param objectKey - MinIO object key
- * @param aesKey - Base64 encoded AES key
+ * Download + decrypt a whole file into a Blob (in memory).
+ * Prefer the streaming service worker (decrypt-stream-service-worker-client.ts) for large files.
  * @param originalFileSize - ORIGINAL file size BEFORE encryption
- * @param onProgress - Progress callback
+ * @param mimeType - set on the Blob so media elements (esp. mobile Chrome) can play it
  */
 const decryptAndDownload = async (
   objectKey: string,
   aesKey: string,
-  originalFileSize: number, // Must be original size, not encrypted size
+  originalFileSize: number,
+  mimeType = 'application/octet-stream',
   onProgress?: (progress: DownloadProgress) => void
 ): Promise<Blob> => {
-  if (originalFileSize < MULTIPART_THRESHOLD) {
-    console.log('Using simple download for small file');
-    return await decryptAndDownloadSmall(objectKey, aesKey, onProgress);
-  } else {
-    console.log('Using chunked download for large file');
-    return await decryptAndDownloadLarge(objectKey, aesKey, originalFileSize, onProgress);
+  const releaseWakeLock = await acquireScreenWakeLock();
+  try {
+    if (originalFileSize < MULTIPART_THRESHOLD) {
+      return await decryptAndDownloadSmall(objectKey, aesKey, mimeType, onProgress);
+    }
+    return await decryptAndDownloadLarge(objectKey, aesKey, originalFileSize, mimeType, onProgress);
+  } finally {
+    releaseWakeLock();
   }
 };
+
 // ============= TEXT ENCRYPT & DECRYPT =============
 
 const encryptText = async (text: string, aesKey: string): Promise<string> => {
